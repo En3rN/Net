@@ -6,8 +6,8 @@ namespace En3rN
 
         uint16_t En3rN::Net::Connection::idCounter = 1000;
 
-        En3rN::Net::Connection::Connection(Type aType, Socket aSocket, IPEndpoint aEndpoint, tsQueue<Packet>& aIncManager) : 
-            type(aType), socket(aSocket), endpoint(aEndpoint), incPacketQue(aIncManager)
+        En3rN::Net::Connection::Connection(Type aType, Socket&& aSocket, IPEndpoint&& aEndpoint, tsQueue<Packet>& aOutManager,tsQueue<Packet>& aIncManager) :
+            type(aType), socket(std::move(aSocket)), endpoint(std::move(aEndpoint)),outPacketQue(aOutManager), incPacketQue(aIncManager)
         {
             id = idCounter;
             idCounter++;
@@ -49,17 +49,15 @@ namespace En3rN
 
         int En3rN::Net::Connection::RecvAll()
         {
-            Packet packet(this->shared_from_this());
+            Packet packet(this->shared_from_this());            
             uint16_t bytesReceived = 0, bytes = 0, remainingSize=0;
-           
-
 
             while (bytesReceived < sizeof(uint16_t))
             {
                 bytes = recv(socket.handle, &packet.body[bytesReceived], sizeof(packet.header), 0);
                 if (bytes == 0)
                 {
-                    Disconnect();                    
+                    Disconnect("Recv 0");                    
                     return 0;
                 }
                 if (bytes == SOCKET_ERROR)
@@ -73,6 +71,11 @@ namespace En3rN
                     return WSAGetLastError();
                 }
                 bytesReceived += bytes;
+            }
+            if (packet.Size() > SO_MAX_MSG_SIZE)
+            {
+                logger(LogLvl::Error) << "Packet header mismath. Size: [" << packet.Size() << "/" << SO_MAX_MSG_SIZE << "]";
+
             }
             packet.body.resize(packet.Size());
             remainingSize = packet.Size();
@@ -97,16 +100,13 @@ namespace En3rN
             }
             if (bytesReceived != packet.Size())
             {
-                logger(LogLvl::Error) << "Packet header mismath. Received: [" << bytesReceived << "/"  << packet.Size() << "]";
-                Packet p(this->shared_from_this());
-                p << packet.body;
-                packet = p;
+                logger(LogLvl::Error) << "Packet header mismath. Received: [" << bytesReceived << "/"  << packet.Size() << "]";                
                 return bytes;
             }
             else
             {
                 logger(LogLvl::Info) << "Packet Succsesfully Received! [" << bytesReceived << "/" << packet.Size() << "]";
-                incPacketQue << packet;
+                incPacketQue << std::move(packet);
                 return bytes;
             }
         }
@@ -154,12 +154,10 @@ namespace En3rN
             //accept
             SOCKADDR_IN client;
             int clientSize = sizeof(client);
-
-            SOCKET s = accept(socket.handle, (sockaddr*)&client, &clientSize);
-            Socket clientSocket(s);
+            Socket clientSocket(accept(socket.handle, (sockaddr*)&client, &clientSize));
             IPEndpoint clientend = IPEndpoint((sockaddr*)&client);
 
-            std::shared_ptr<Connection> newclient = std::make_shared<Connection>(Type::Accepted, clientSocket, clientend, incPacketQue);
+            std::shared_ptr<Connection> newclient = std::make_shared<Connection>(Type::Accepted, std::move(clientSocket), std::move(clientend),outPacketQue, incPacketQue);
 
             char host[NI_MAXHOST];
             char service[NI_MAXHOST];
@@ -179,10 +177,10 @@ namespace En3rN
             Packet packet(newclient);
             std::string msg = "[Server]Welcome to En3rN Server";            
             packet << msg;
-            incPacketQue << packet;            
+            outPacketQue << std::move(packet);
             Packet pid(newclient, PacketType::ClientID);
             pid << newclient->id;
-            incPacketQue << pid;
+            outPacketQue << std::move(pid);
             return newclient;
         }
 
@@ -227,11 +225,11 @@ namespace En3rN
             return 0;
         }
 
-        int En3rN::Net::Connection::Disconnect()
+        int En3rN::Net::Connection::Disconnect(const std::string& reason)
         {            
             connected = false;            
-            //logger(LogLvl::Info) << "Disconnecting from server!";
-            socket.Close();            
+            logger(LogLvl::Info) << "Removing Connection [" << id << "] " << reason;
+            //socket.Close();            
             return 0;
         }
 

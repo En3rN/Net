@@ -44,7 +44,7 @@ namespace En3rN
             }
             if (strBuf == "disconnect")
             {
-                connection->Disconnect();
+                connection->Disconnect("User Disconnect");
             }
 
             std::vector<std::string> v = Helpers::Split(strBuf, ' ');
@@ -77,7 +77,7 @@ namespace En3rN
             Network::StartupWinsock();
 
             //create connection
-            connection=std::make_shared<Connection>(Connection::Type::Connecter, std::move(Socket()), IPEndpoint(settings.ip, settings.port), incManager);
+            connection=std::make_shared<Connection>(Connection::Type::Connecter, Socket(), IPEndpoint(settings.ip, settings.port),outManager, incManager);
             if (!connection->IsConnected())
             {
                 logger(LogLvl::Error) << "Failed to initialize";
@@ -92,7 +92,7 @@ namespace En3rN
         {
             while (!incManager.Queue.empty())
             {
-                Packet packet = incManager.PopBack();
+                Packet packet = std::move(incManager.PopBack());
                 std::string str;
                 int i;
                 //todo find out what server needs to do with msg
@@ -110,39 +110,64 @@ namespace En3rN
                 case PacketType::ClientID:
                     uint16_t id;
                     packet >> id;
-                    packet.owner->SetID(id);
+                    packet.address->SetID(id);
                     break;
                 default:
                     logger(LogLvl::Warning) << "Unknown PackeTtype! deleting!";
-                    
+
                     break;
                 }
                 logger(LogLvl::Info) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
             }
-        return true;
-    }
-        void TcpClient::NetworkFrame()
-        {
+            return true;
+        }
+        bool TcpClient::NetworkFrame()
+        {            
             int result = 0;
             int poll = 0;
-           
-            poll = WSAPoll(&connection->PollFD(), 1, settings.timeout);
-            if (poll > 0) connection->RecvAll();
+            
+            pollfd pFd = connection->PollFD();
+            poll = WSAPoll(&pFd, 1, settings.timeout);
+            if (poll > 0)
+            {
+                while (pFd.revents != NULL)
+                {
+                    if (pFd.revents & POLLRDNORM)
+                    {
+                        int r = connection->RecvAll();
+                        if (r < 1)  connection->Disconnect("Recv < 1"); 
+                        break;
+                    }
+                    if (pFd.revents & POLLERR) { connection->Disconnect("POLLERR"); break; }
+                    if (pFd.revents & POLLHUP) { connection->Disconnect("POLLHUP"); break; }
+                    if (pFd.revents & POLLNVAL) { connection->Disconnect("POLLINVAL"); break; }
+
+                    logger(LogLvl::Warning) << "Unhandled Flag! Revents: " << pFd.revents << " On connectionID: " << connection->ID();
+                }
+
+            }
+            if (poll == SOCKET_ERROR)
+            {
+                logger(LogLvl::Error) << "PollErr: " << WSAGetLastError();
+                connection->Disconnect("SocketError");                
+            }
             
             while (outManager.Queue.size() > 0)
             {
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
                 Packet packet = outManager.PopBack();                
-                if (packet.owner->SendAll(packet) != 0)
+                if (packet.address->SendAll(packet) != 0)
                     incManager << packet; //putting packet back in que if failed to send
             }
-            if (!settings.networkThread && !settings.loop) m_running = OnUserUpdate(incManager, outManager, connection);
+            if (!settings.networkThread && !settings.loop) m_running = OnUserUpdate(incManager, outManager, connection);   
+            m_running= connection->IsConnected();
+            return 0;
         }
         void TcpClient::Stop()
         {
             while (settings.networkThread) {};
             // close sockets
-            connection->Close();
+            connection.reset();
             //cleanup winsock
             Network::ShutDownWinsock();
         }
@@ -156,15 +181,15 @@ namespace En3rN
             if (settings.networkThread)
             {
                 std::thread networkThread([&] {while (m_running) { NetworkFrame(); }
-                logger(LogLvl::Debug) << "NetworkThread Finished: " << std::this_thread::get_id();
-                settings.networkThread = false; });
+                    logger(LogLvl::Debug) << "NetworkThread Finished: " << std::this_thread::get_id();
+                    settings.networkThread = false; });
                 networkThread.detach();
             }
             if (settings.consoleThread)
             {
                 std::thread consolethread([&] {while (m_running) { Console(); }
-                logger(LogLvl::Debug) << "ConsoleThread Finished: " << std::this_thread::get_id();
-                settings.consoleThread = false; });
+                    logger(LogLvl::Debug) << "ConsoleThread Finished: " << std::this_thread::get_id();
+                    settings.consoleThread = false; });
                 consolethread.detach();
             }
 
@@ -175,6 +200,7 @@ namespace En3rN
             }
             return 0;
             
-        };        
+        };
+        
     }
 }

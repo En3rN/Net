@@ -44,7 +44,7 @@ namespace En3rN
 		struct Item
 		{
 			ItemHeader header;
-			t item;
+			t data;
 		};
 
 		/*buffer will be stored like this:
@@ -62,13 +62,14 @@ namespace En3rN
 		
 
 		class Packet
-		{
+		{			
 		public:
 			//template <typename t>
 			//std::iterator<Item<t>> itt;
-			std::shared_ptr<Connection> owner;
+			std::shared_ptr<Connection> address;
 			Header header;
-			std::string body;
+			std::vector<char> body;
+			
 
 			Packet();			
 			Packet(std::shared_ptr<Connection> aOwner, PacketType aType=PacketType::Message);
@@ -77,6 +78,8 @@ namespace En3rN
 			~Packet();
 			void Clear();
 			void Append(const void* data, uint16_t size);
+			void WriteHeader();
+			void ReadHeader();
 			PacketType GetPacketType();
 			uint16_t Size();
 			uint16_t ItemCount();
@@ -86,60 +89,50 @@ namespace En3rN
 			size_t SetType(T& data)
 			{
 				return typeid(T).hash_code();
-			}
+			}			
 			
-			uint16_t ItemSize(char* data)	
-			{				
-				return sizeof(data);
-			}
 
 			Packet& operator=(const Packet& other);
 
 			Packet& operator >> (std::string& data);
 			
-			Packet& operator << (std::string& data);
+			Packet& operator << (const std::string& data);
 
-			template <typename t>
-			Packet& operator<< (const t& data)
-			{
+			template <typename t, class = typename std::enable_if<std::is_standard_layout<t>::value>::type>
+			Packet& operator<< (t& data)
+			{				
 				ItemHeader ih;
 				ih.type = SetType(data);
-				ih.size = ItemSize((char*)data);
+				ih.size = sizeof(data);
 				
-				
-				body.resize(body.size() + sizeof(ih) + sizeof(data));
-				memcpy(&body[header.packetSize], &ih, sizeof(ih)); 
-				memcpy(&body[header.packetSize + sizeof(ih)], &data, sizeof(data));
-				/*Append((char*)ih.type, sizeof(ih.type));
-				Append((char*)ih.size, sizeof(ih.size));
-				Append((char*)data, ih.size);*/
-
-				//update PacketHeader
-				header.packetSize += sizeof(ih) + ih.size;
+				Append(&ih.type, sizeof(ih.type));
+				Append(&ih.size, sizeof(ih.size));
+				Append(&data, ih.size);
+				//update PacketHeader				
 				header.itemcount++;
-				memcpy(&body[0], &header, sizeof(header));
+				WriteHeader();
 				return *this;
 			}
-			template <typename t>
+			template <typename t, class = typename std::enable_if<std::is_standard_layout<t>::value>::type>
 			Packet& operator>> (t& data)
 			{
-				uint16_t offset = sizeof(header);
-				ItemHeader itemheader;
+				uint16_t offset = sizeof(header.type) + sizeof(header.packetSize) + sizeof(header.itemcount);
+				ItemHeader ih;
 				size_t dataType = SetType(data);
 
 
 				while (offset < body.size())
 				{
-					itemheader.type = GetType(offset);
-					itemheader.size = GetItemSize(offset);
+					ih.type = GetType(offset);
+					ih.size = GetItemSize(offset);
 
-					if (itemheader.type == dataType)
+					if (ih.type == dataType)
 					{
-						memcpy(&itemheader, &body[offset], sizeof(itemheader));
-						memcpy(&data, &body[offset + sizeof(itemheader)], sizeof(data));						
+						//memcpy(&ih, &body[offset], sizeof(ih));
+						memcpy(&data, &body[offset + sizeof(ih.type) + sizeof(ih.size)], sizeof(data));
 						return *this;
 					}
-					offset += itemheader.size + sizeof(itemheader);
+					offset += ih.size + sizeof(ih.type)+sizeof(ih.size);
 				}
 				logger(LogLvl::Error) << "Type not found in packet";
 				return *this;

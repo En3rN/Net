@@ -11,7 +11,7 @@ namespace En3rN
 		Packet::Packet()
 		{
 			body.resize(sizeof(header));
-			owner = nullptr;
+			address = nullptr;
 			header.type = PacketType::Message;
 			header.packetSize = (sizeof(header));
 			header.itemcount = 0;
@@ -21,33 +21,34 @@ namespace En3rN
 		Packet::Packet(std::shared_ptr<Connection> aOwner, PacketType aType)
 		{
 			body.resize(sizeof(header));
-			owner = aOwner;
+			body.reserve(100);
+			address = aOwner;
 			header.type = aType;
 			header.packetSize = (sizeof(header));
 			header.itemcount = 0;
-			memcpy(&body[0], &header, sizeof(header));
+			memcpy(&body[0], &header, sizeof(header));			
 		}
 		
 		Packet::Packet(const Packet& other)
-		{
-			//logger(LogLvl::Debug) << "Packet copy!";
-			owner = other.owner;
+		{			
+			logger(LogLvl::Debug) << "Packet copy!";
+			address = other.address;
 			header = other.header;
 			body = other.body;
 		}
 		Packet::Packet(Packet&& other) noexcept
-		{
-			//logger(LogLvl::Debug) << "Packet moved!";
-			owner = other.owner;
+		{			
+			logger(LogLvl::Debug) << "Packet moved!";
+			address = other.address;
 			header = other.header;
 			body = other.body;
-			other.owner = nullptr;
+			other.address = nullptr;
 
 			ZeroMemory(&other, sizeof(other));
 		}
 		Packet::~Packet()
-		{
-			//logger(LogLvl::Debug) << "Packet deleted!";
+		{			
+			if (body.size() != 0) logger(LogLvl::Debug) << "Packet deleted!";
 			Clear();
 
 		}
@@ -63,7 +64,7 @@ namespace En3rN
 
 		uint16_t Packet::GetItemSize(uint16_t offset)
 		{
-			return (*(uint16_t*)(&body[(size_t)offset + sizeof(ItemHeader::type)]));
+			return (*(uint16_t*)(body.data()+ (size_t)offset + sizeof(size_t)));
 		}
 
 		size_t Packet::GetType(uint16_t offset)
@@ -80,11 +81,26 @@ namespace En3rN
 		void Packet::Append(const void * data, uint16_t size)
 		{
 			if (body.size() + size < SO_MAX_MSG_SIZE)
-			{				
-				body.insert(body.end(), (char)data, (char)data + size);
+			{
+				body.insert(body.end(), (char*)data, (char*)data + size);
+				header.packetSize += size;
 			}
 			else
 				logger(LogLvl::Error) << "Item does not fit in packet";			
+		}
+
+		void Packet::WriteHeader()
+		{
+			memcpy(body.data(),													&header.type,			sizeof(header.type));
+			memcpy(body.data()+ sizeof(header.type),							&header.packetSize,		sizeof(header.packetSize));
+			memcpy(body.data()+ sizeof(header.type)+ sizeof(header.packetSize), &header.itemcount,		sizeof(header.itemcount));
+		}
+
+		void Packet::ReadHeader()
+		{
+			memcpy(&header.type,		body.data(),													sizeof(header.type));
+			memcpy(&header.packetSize,	body.data() + sizeof(header.type),								sizeof(header.packetSize));
+			memcpy(&header.itemcount,	body.data() + sizeof(header.type) + sizeof(header.packetSize),  sizeof(header.itemcount));
 		}
 
 		PacketType Packet::GetPacketType()
@@ -96,46 +112,52 @@ namespace En3rN
 		{
 			logger(LogLvl::Debug) << "packet copy!";
 			Clear();
-			owner = other.owner;
+			address = other.address;
 			header = other.header;
 			body = other.body;
 			return *this;
 		}
 		Packet& Packet::operator>>(std::string& data)
 		{
-			uint16_t offset = sizeof(header);
-			ItemHeader itemheader;
+			uint16_t offset = sizeof(header.type)+ sizeof(header.packetSize)+ sizeof(header.itemcount);
+			ItemHeader ih;
 			size_t dataType = SetType(data);
 
 			while (offset < body.size())
 			{
-				itemheader.type = GetType(offset);
-				itemheader.size = GetItemSize(offset);
+				ih.type = GetType(offset);
+				ih.size = GetItemSize(offset);
 
-				if (itemheader.type == dataType)
+				if (ih.type == dataType)
 				{
-					data.resize(itemheader.size);
-					data.assign(&body[offset + sizeof(itemheader)], &body[offset + sizeof(itemheader) + itemheader.size]);
-					memcpy(&body[offset], &itemheader.type, sizeof(itemheader.type));
+					uint16_t itemOffset = offset + sizeof(ih.type) + sizeof(ih.size);
+					data.resize(ih.size);
+					//data.assign(&body[itemOffset], &body[itemOffset + ih.size]);
+					data.assign(body.begin() + offset + sizeof(ih.type) + sizeof(ih.size), 
+								body.begin() + offset + sizeof(ih.type) + sizeof(ih.size) + ih.size);
+					
+					/*ih.type = 0;
+					memcpy(&body[offset], &ih.type, sizeof(ih.type));*/
 					return *this;
 				}
-				offset += itemheader.size + sizeof(itemheader);
+				offset += ih.size + sizeof(ih.type)+ sizeof(ih.size);
 			}
 			logger(LogLvl::Error) << "Type not found in packet";
 			return *this;
 
 		}
-		Packet& Packet::operator<<(std::string& data)
+		Packet& Packet::operator<<(const std::string& data)
 		{
 			ItemHeader ih;
 			ih.type = SetType(data);
 			ih.size = data.size();
-			body.resize(body.size() + sizeof(ih));
-			memcpy(&body[header.packetSize], &ih, sizeof(ih));
-			body.insert(body.size(), data);
-			header.packetSize += sizeof(ih) + ih.size;
+
+			Append(&ih.type, sizeof(ih.type));
+			Append(&ih.size, sizeof(ih.size));
+			Append(data.data(), data.size());
+			
 			header.itemcount++;
-			memcpy(&body[0], &header, sizeof(header));
+			WriteHeader();
 			
 			return *this;
 		}

@@ -14,10 +14,10 @@ namespace En3rN
 		class Socket
 		{
 		public:	
-			Socket(SocketHandle aHandle);
-			Socket(IPVersion ipv=IPVersion::IPv4, SocketHandle handle =INVALID_SOCKET);
-			Socket(Socket& other);
-			Socket operator=(Socket& other);
+			Socket(SocketHandle&& aHandle);
+			Socket(IPVersion ipv=IPVersion::IPv4, SocketHandle&& handle =INVALID_SOCKET);
+			//Socket(Socket&& other);
+			Socket& operator=(Socket&& other) noexcept;
 			Socket(Socket&& other) noexcept;
 			~Socket();
 		

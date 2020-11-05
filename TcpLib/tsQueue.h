@@ -24,6 +24,13 @@ namespace En3rN
 
 			tsQueue& operator << (T& item)
 			{
+				Queue.push_front(item);
+				return *this;
+
+			}
+						
+			tsQueue& operator << (T&& item)
+			{
 				Queue.push_front(std::move(item));
 				return *this;
 
@@ -36,30 +43,28 @@ namespace En3rN
 				return *this;
 			}
 
-			const T Front()
+			const T& Front()
 			{
-				std::scoped_lock lock(muxQueue);
-				T item = Queue.front();
-				return item;
+				std::scoped_lock lock(muxQueue);				
+				return &Queue.front();
 			}
-			const T Back()
+			const T& Back()
 			{
-				std::scoped_lock lock(muxQueue);
-				T item = Queue.back();
-				return item;
+				std::scoped_lock lock(muxQueue);				
+				return  &Queue.back();
 			}
 
 			T PopFront()
 			{
 				std::scoped_lock lock(muxQueue);
-				T item = Queue.front();
+				T item = std::move(Queue.front());
 				Queue.pop_front();
 				return item;
 			}
 			T PopBack()
 			{
 				std::scoped_lock lock(muxQueue);
-				T item = Queue.back();
+				T item = std::move(Queue.back());
 				Queue.pop_back();
 				return item;
 			}

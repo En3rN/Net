@@ -21,7 +21,7 @@ namespace En3rN
 			enum class Type
 			{Listener,Connecter,Accepted};
 
-			Connection(Type aType,Socket aSocket, IPEndpoint aEndpoint, tsQueue<Packet>& aIncManager);
+			Connection(Type aType, Socket&& aSocket, IPEndpoint&& aEndpoint, tsQueue<Packet>& aOutManager, tsQueue<Packet>& aIncManager);
 			~Connection();
 			int SendAll(Packet& packet);
 			int RecvAll();
@@ -29,7 +29,7 @@ namespace En3rN
 			std::shared_ptr<Connection> Accept();
 			int Bind();
 			int Listen();
-			int Disconnect();
+			int Disconnect(const std::string& reason);
 			int Close();
 			bool IsConnected() const;
 			uint16_t ID();
@@ -50,6 +50,7 @@ namespace En3rN
 			uint16_t id;
 			User user;
 			pollfd pFd;
+			tsQueue<Packet>& outPacketQue;
 			tsQueue<Packet>& incPacketQue;
 			bool connected = false;
 

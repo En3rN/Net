@@ -11,8 +11,6 @@ int main()
 	using namespace En3rN::Net;
 	TcpServer server = TcpServer();
 	if(server.Init()==0)
-		server.Start();
-	
-	
+		server.Start();	
 	return 0;
 }

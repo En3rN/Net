@@ -7,36 +7,57 @@ namespace En3rN
 {
     namespace Net
     {  
-        Socket::Socket(SocketHandle aHandle) :  handle(aHandle)
+        Socket::Socket(SocketHandle&& aHandle) :  handle(std::move(aHandle))
         {
+            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
+            aHandle = INVALID_SOCKET;
             Create();
         }
 
-        Socket::Socket(IPVersion aIpv, SocketHandle aHandle) : ipVersion(aIpv), handle(aHandle)
+        Socket::Socket(IPVersion aIpv, SocketHandle&& aHandle) : ipVersion(aIpv), handle(std::move(aHandle))
         {
+            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
+            aHandle = INVALID_SOCKET;
             Create();
         }
 
-        Socket::Socket(Socket& other)
+        /*Socket::Socket(Socket&& other)
         {
+            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
             ipVersion = other.ipVersion;
-            handle = other.handle;
-        }
+            handle = std::move(other.handle);
+            other.handle = INVALID_SOCKET;
+        }*/
 
-        Socket Socket::operator=(Socket& other)
+        Socket& Socket::operator=(Socket&& other) noexcept
         {
-            return Socket(other);
+            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
+            Close();
+            ipVersion = std::move(other.ipVersion);
+            handle = std::move(other.handle);
+            other.handle = INVALID_SOCKET;
+            return *this;
         }
 
 
         Socket::Socket(Socket&& other) noexcept
         {
-            ipVersion = other.ipVersion;
-            handle = other.handle;            
-            other.handle = SOCKET_ERROR;
+            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
+            ipVersion = std::move(other.ipVersion);
+            handle = std::move(other.handle);
+            other.handle = INVALID_SOCKET;
         }
 
-        Socket::~Socket() {}
+        Socket::~Socket() 
+        {
+            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
+            if (handle != INVALID_SOCKET)
+            {
+                logger(LogLvl::Debug) << "Closing Socket [" << handle << "] " << closesocket(handle) << " Err: " << WSAGetLastError();
+                
+            }
+
+        }
 
         int Socket::SetOption(SocketOption option, BOOL value)
         {            

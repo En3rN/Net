@@ -109,6 +109,6 @@ int main()
 	if (client.Init() == 0)	
 		client.Start();
 	
-	std::cin.get();
+	//std::cin.get();
 	return 0;
 }

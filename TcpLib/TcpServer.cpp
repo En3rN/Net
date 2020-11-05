@@ -39,7 +39,7 @@ namespace En3rN
             Network::StartupWinsock();
 
             //create listening connection
-            connections.emplace_back(std::make_shared<Connection>(Connection::Type::Listener, std::move(Socket()),IPEndpoint(settings.ip, settings.port), incManager));
+            connections.emplace_back(std::make_shared<Connection>(Connection::Type::Listener, Socket(),IPEndpoint(settings.ip, settings.port),outManager, incManager));
             if (!connections[0]->IsConnected())
             {
                 logger(LogLvl::Error) << "Failed to initialize";                
@@ -57,29 +57,22 @@ namespace En3rN
         {
             while (!incManager.Queue.empty())
             {
-                Packet packet = incManager.Back();
+                Packet packet = std::move(incManager.PopBack());
                 std::string str;
+                Packet response;
                 //todo find out what server needs to do with msg
                 logger(LogLvl::Info) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
                 switch (packet.header.type)
                 {
-                case PacketType::Message:                     
-                    if (packet.owner->GetType() != Connection::Type::Listener)
+                case PacketType::Message:
+                    packet >> str;
+                    
+                    if (str.find("all", 0) != str.npos)
                     {
-                        incManager >> outManager;
-                    }
-                    else if (packet.body.find("all", 6) != str.npos)
-                    {
-                        for (auto client : clients)
-                        {
-                            if (client->GetType() != Connection::Type::Listener)
-                            {
-                                packet = incManager.Back();
-                                packet.owner = client->shared_from_this();
-                                outManager << packet;
-                            }
-                        }
-                        incManager.PopBack();
+                        str.erase(str.find("all ", 0), 4);
+                        response << str;
+
+                        SendToAll(response, packet.address);
                         break;
                     }
                     else
@@ -87,36 +80,32 @@ namespace En3rN
 
                         for (auto client : clients)
                         {
-                            if (packet.body.find(client->UserName(), 6) != str.npos)
+                            if (client->GetType() == Connection::Type::Listener) continue;
+                            if (str.find(client->UserName(), 0) != str.npos || str.find(std::to_string(client->ID()),6) != str.npos)
                             {
-                                logger(LogLvl::Info) << packet.owner->UserName() << " " << str;
-                                incManager >> outManager;
+                                logger(LogLvl::Info) << packet.address->UserName() << " " << str;
+                                packet.address = client->shared_from_this();
+                                outManager << std::move(packet);
                                 break;
                             }
-                        }
-                        logger(LogLvl::Warning) << "Could not find receiver -- deleting packet";
-                        incManager.PopBack();
+                        }                            
+                        logger(LogLvl::Warning) << "Could not find receiver!";
                         break;
                     }
+                    
                     break;
                 case PacketType::Command:
                     //TODO implement commands for server
                     logger(LogLvl::Warning) << "Invalid command! Deleting!";
                     break;
                 default:
-                    if (packet.owner == nullptr)
-                    {
+                    if (packet.address == nullptr)
                         logger(LogLvl::Warning) << "Unknown PackeTtype! deleting!";
-                        incManager.PopBack();
-                    }
                     else
-                        incManager >> outManager;
+                        outManager << packet;
                     break;
                 }
                 logger(LogLvl::Info) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
-
-            
-            
             }
             return true;
         }
@@ -156,8 +145,8 @@ namespace En3rN
         {   
             while (settings.networkThread) {};            
             // close sockets
-            for (auto connection : connections)
-                connection->Close();
+            connections.clear();
+                
 
            Network::ShutDownWinsock();
         }
@@ -176,54 +165,28 @@ namespace En3rN
             {
                 for (auto i = 0; i < useFDS.size(); i++)
                 {
-                    switch (useFDS[i].revents)
-                    {
-                    case 0:
-                        continue;
-                        
-                    case  POLLRDNORM:
+                    if (useFDS[i].revents == 0) continue;
+                    
+                    if(useFDS[i].revents & POLLRDNORM)
                         if (connections[i]->GetType() == Connection::Type::Listener)
                         {
                             std::shared_ptr<Connection> newConnection = connections[i]->Accept();
                             pollFDS.emplace_back(newConnection->PollFD());
                             connections.push_back(newConnection);
-                            break;
+                            continue;
                         }
                         else
                         {
                             int r = connections[i]->RecvAll();
-                            switch (r)
-                            {
-                            case -1:
-                                CloseConnection(i, "Recv < 0");
-                                break;
-                            case 0:
-                                CloseConnection(i, "Recv = 0");
-                                break;
-                            default:
-                                break;
-                            }
-
-                            break;
+                            if (r < 1) { CloseConnection(i, "Recv" + std::to_string(r)); }          continue;
                         }
-                        break;
-                    case POLLERR:
-                        CloseConnection(i, "POLLERR");
 
-                        break;
-                    case POLLHUP:
-                        //TODO start timer for removing connection
-                        CloseConnection(i, "POLLHUP");
-                        break;
+                    if (useFDS[i].revents & POLLERR)    { CloseConnection(i, "POLLERR");    continue; }
+                    if (useFDS[i].revents & POLLHUP)    { CloseConnection(i, "POLLHUP");    continue; }
+                    if (useFDS[i].revents & POLLNVAL)   { CloseConnection(i, "POLLINVAL");  continue; }
+                   
+                logger(LogLvl::Warning) << "Unhandled Flag! Revents: "<< useFDS[i].revents <<" On connectionID: " << connections[i]->ID();
                     
-                    case POLLNVAL:
-                        CloseConnection(i, "POLLINVAL");
-                        break;
-                        
-                    default:
-                        logger(LogLvl::Warning) << "Revents: "<< useFDS[i].revents <<" On connectionID: " << connections[i];
-                        break;
-                    }
                 }
             }
             if (poll == SOCKET_ERROR) logger(LogLvl::Error) << "PollErr: " << WSAGetLastError();
@@ -232,9 +195,11 @@ namespace En3rN
             while (outManager.Queue.size() > 0)
             {
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
-                Packet packet = outManager.PopBack();                
-                if (packet.owner->SendAll(packet) != 0)
-                    incManager << packet; //putting packet back in que if failed to send
+                Packet packet = std::move(outManager.PopBack());
+                if (packet.address->SendAll(packet) != 0)
+                {
+                    //TODO:: decide if we want to try again
+                }
             }
             if (!settings.networkThread && !settings.loop) m_running = OnUserUpdate(incManager, outManager, connections);
         }
@@ -252,38 +217,43 @@ namespace En3rN
             }
 
             std::vector<std::string> v = Helpers::Split(strBuf, ' ');
-            if (v.size() > 2)
+                
+            try
             {
-                for (auto& client : connections)
-                    if (client->UserName() == v[1] || v[1] == "all" || std::to_string(client->ID())==v[1])
-                    {
-                        try
-                        {
-                            if (client->GetType() != Connection::Type::Listener)
-                            {
-                                Packet packet(client->shared_from_this());
-                                packet.header.type = (PacketType)stoi(v[0]);
-                                v.erase(v.begin());
-                                v[0] = "[Server]";
-                                std::string msg= Helpers::Join(v, ' ');
-                                packet << msg;
-                                outManager << packet;
-                            }
-                        }
-                        catch (const std::exception& err)
-                        {
-                            logger(LogLvl::Error) << err.what() << " Correct syntax: username intPackettype message/instruction ";
-                        }
-                    }
+                if ((PacketType)std::stoi(v[0]) == PacketType::Message)
+                {
+                    Packet packet(connections[0]->shared_from_this());
+                    v[0] = "[Server]";
+                    std::string msg = Helpers::Join(v, ' ');
+                    packet << msg;
+                    incManager << std::move(packet);
+                }
             }
+            catch (const std::exception& err)
+            {
+                logger(LogLvl::Error) << err.what() << " Correct syntax: username intPackettype message/instruction ";
+            }
+                   
+            
             return 0;
         }
-        int TcpServer::CloseConnection(int index, std::string reason)
+        int TcpServer::CloseConnection(int index, const std::string& reason)
         {
-            connections[index]->Disconnect();            
+            connections[index]->Disconnect(reason);            
             connections.erase(connections.begin() + index);
             pollFDS.erase(pollFDS.begin() + index);
-            logger(LogLvl::Info) << "Removing Connection [" << index << "] " << reason;
+            return 0;
+        }
+        int TcpServer::SendToAll(Packet& packet, std::shared_ptr<Connection> ignoreClient)
+        {
+            for (auto& client : connections)
+            {
+                if (client->GetType() != Connection::Type::Listener && client!=ignoreClient)
+                {
+                    packet.address = client->shared_from_this();
+                    outManager << packet;
+                }
+            }
 
             return 0;
         }

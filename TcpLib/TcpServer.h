@@ -24,7 +24,8 @@ namespace En3rN
 
 			void NetworkFrame();
 			int Console();
-			int CloseConnection(int index, std::string reason);
+			int CloseConnection(int index, const std::string& reason);
+			int SendToAll(Packet& packet, std::shared_ptr<Connection> ignoreClient = nullptr);
 			
 		public:
 			TcpServer();			
