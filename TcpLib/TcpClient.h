@@ -24,12 +24,14 @@ namespace En3rN
 			TcpClient();
 			virtual ~TcpClient();
 			virtual int OnClientConnect();
-			virtual bool OnUserUpdate(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::shared_ptr<Connection>& connection);
-			bool NetworkFrame();
+			virtual int OnClientDisconnect();
+			virtual int ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::shared_ptr<Connection>& connection);			
+			int SendData(Packet& packet);
+			int NetworkFrame();
 			int Console();
 			int Init();
 			int Start();
-			void Stop();
+			int Stop();
 
 		};
 	}

@@ -28,6 +28,11 @@ namespace En3rN
             return 0;
         }
 
+        int TcpClient::OnClientDisconnect()
+        {
+            return 0;
+        }
+
 
         int TcpClient::Console()
         {
@@ -39,7 +44,7 @@ namespace En3rN
 
             if (strBuf == "exit")
             {
-                m_running = false;
+                connection->Disconnect("User Exit");
                 return -1;
             }
             if (strBuf == "disconnect")
@@ -88,7 +93,7 @@ namespace En3rN
             return 0;
         }
         
-        bool TcpClient::OnUserUpdate(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::shared_ptr<Connection>& connection)
+        int TcpClient::ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::shared_ptr<Connection>& connection)
         {
             while (!incManager.Queue.empty())
             {
@@ -121,7 +126,12 @@ namespace En3rN
             }
             return true;
         }
-        bool TcpClient::NetworkFrame()
+        int TcpClient::SendData(Packet& packet)
+        {
+
+            return 0;
+        }
+        int TcpClient::NetworkFrame()
         {            
             int result = 0;
             int poll = 0;
@@ -159,17 +169,18 @@ namespace En3rN
                 if (packet.address->SendAll(packet) != 0)
                     incManager << packet; //putting packet back in que if failed to send
             }
-            if (!settings.networkThread && !settings.loop) m_running = OnUserUpdate(incManager, outManager, connection);   
+            if (!settings.networkThread && !settings.loop) m_running = ProcessPackets(incManager, outManager, connection);   
             m_running= connection->IsConnected();
             return 0;
         }
-        void TcpClient::Stop()
+        int TcpClient::Stop()
         {
             while (settings.networkThread) {};
             // close sockets
             connection.reset();
             //cleanup winsock
             Network::ShutDownWinsock();
+            return 0;
         }
 
         int TcpClient::Start()
@@ -195,7 +206,7 @@ namespace En3rN
 
             if (settings.loop && m_running)
             {
-                while (OnUserUpdate(incManager, outManager, connection) && m_running) {}                
+                while (ProcessPackets(incManager, outManager, connection) && m_running) {}                
                 m_running = false;
             }
             return 0;
