@@ -198,7 +198,6 @@
     </ClInclude>
     <ClInclude Include="IPEndpoint.h" />
     <ClInclude Include="logger.h" />
-    <ClInclude Include="MyFDS.h" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="Packet.h" />
     <ClInclude Include="Socket.h" />

@@ -13,7 +13,7 @@ namespace En3rN
         }
         TcpClient::TcpClient()
         {
-            settings.ip = "127.1.1.1";
+            settings.ip = "gafi";
             settings.port = 50000;
             settings.consoleThread = true;
             settings.networkThread = true;
@@ -82,7 +82,8 @@ namespace En3rN
             Network::StartupWinsock();
 
             //create connection
-            connection=std::make_shared<Connection>(Connection::Type::Connecter, Socket(), IPEndpoint(settings.ip, settings.port),outManager, incManager);
+            IPEndpoint endpoint(settings.ip, settings.port);
+            connection=std::make_shared<Connection>(Connection::Type::Connecter, Socket(endpoint.GetIPVersion()), std::move(endpoint),outManager, incManager);
             if (!connection->IsConnected())
             {
                 logger(LogLvl::Error) << "Failed to initialize";
@@ -101,7 +102,7 @@ namespace En3rN
                 std::string str;
                 int i;
                 //todo find out what server needs to do with msg
-                logger(LogLvl::Info) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
+                logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
                 switch (packet.GetPacketType())
                 {
                 case PacketType::Message:
@@ -121,8 +122,7 @@ namespace En3rN
                     logger(LogLvl::Warning) << "Unknown PackeTtype! deleting!";
 
                     break;
-                }
-                logger(LogLvl::Info) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
+                }                
             }
             return true;
         }
@@ -186,8 +186,7 @@ namespace En3rN
         int TcpClient::Start()
         {
             
-            logger(LogLvl::Info) << "Starting Client";
-            if (m_running != true) Stop();
+            logger(LogLvl::Info) << "Starting Client";            
 
             if (settings.networkThread)
             {

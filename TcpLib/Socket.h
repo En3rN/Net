@@ -11,21 +11,25 @@ namespace En3rN
 		{
 			TCP_Nodelay, IPv6_Only, NonBlocking
 		};
+
+		
+
 		class Socket
 		{
+			friend class Connection;
+
 		public:	
 			Socket(SocketHandle&& aHandle);
-			Socket(IPVersion ipv=IPVersion::IPv4, SocketHandle&& handle =INVALID_SOCKET);
-			//Socket(Socket&& other);
+			Socket(IPVersion ipVersion=IPVersion::IPv4);			
 			Socket& operator=(Socket&& other) noexcept;
 			Socket(Socket&& other) noexcept;
 			~Socket();
-		
+
+		private:		
 			int SetOption(SocketOption option, BOOL value);
-			int Create();
+			int Create(IPVersion ipVersion= IPVersion::Unknown);
 			int Close();
 			
-			IPVersion ipVersion;
 			SocketHandle handle;
 		};
 	}

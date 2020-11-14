@@ -2,22 +2,23 @@
 #include "helpers.h"
 #include <assert.h>
 #include <string>
+#include "logger.h"
 
 namespace En3rN
 {
 	namespace Net
 	{		
-		IPEndpoint::IPEndpoint(const char* aIp, unsigned short aPort) :ip(aIp), hostname(aIp), port(aPort)
-		{			
+		IPEndpoint::IPEndpoint(const char* aIp, unsigned short aPort) : ip(aIp),hostname(aIp), port(aPort)
+		{	
+			ipversion = IPVersion::Unknown;
 			in_addr addr;
 			
 			if (inet_pton(AF_INET, aIp, &addr) == 1)
 			{
-				if (addr.S_un.S_addr != INADDR_NONE)
-				{					
-					ipversion = IPVersion::IPv4;
-					return;
-				}
+				ipversion = IPVersion::IPv4;
+				if (inet_ntop(AF_INET, &addr.S_un.S_addr, &ip[0], 16) == NULL)
+					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';
+				return;
 			}
 
 				
@@ -28,11 +29,12 @@ namespace En3rN
 
 			if (getaddrinfo(aIp, NULL, &hints, &hostinfo) == 0)
 			{
+				ipversion = IPVersion::IPv4;
 				sockaddr_in* host_addr = reinterpret_cast<sockaddr_in*> (hostinfo->ai_addr);
 				ip.resize(16);
-				inet_ntop(AF_INET, &host_addr->sin_addr, &ip[0], 16);
-				//Helpers::trim(ip);				
-				ipversion = IPVersion::IPv4;
+				if(inet_ntop(AF_INET, &host_addr->sin_addr, &ip[0], 16)==NULL)
+					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';
+				Helpers::trim(ip);				
 				freeaddrinfo(hostinfo);
 				return;
 			}
@@ -40,8 +42,11 @@ namespace En3rN
 			//IPv6
 			in6_addr addr6;
 			if (inet_pton(AF_INET6, aIp, &addr6) == 1)
-			{				
+			{
 				ipversion = IPVersion::IPv6;
+				ip.resize(46);
+				if (inet_ntop(AF_INET6, &addr6.u.Byte, &ip[0], 46) == NULL)
+					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';
 				return;
 			}
 
@@ -52,16 +57,16 @@ namespace En3rN
 
 			if (getaddrinfo(aIp, NULL, &hintsv6, &hostinfov6) == 0)
 			{
+				ipversion = IPVersion::IPv6;
 				sockaddr_in6* host_addr = reinterpret_cast<sockaddr_in6*>(hostinfov6->ai_addr);
 				ip.resize(46);
-				inet_ntop(AF_INET6, &host_addr->sin6_addr, &ip[0], 46);
-				//Helpers::trim(ip);					
-				ipversion = IPVersion::IPv6;
+				if (inet_ntop(AF_INET6, &host_addr->sin6_addr, &ip[0], 46) == NULL)
+					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';
+				Helpers::trim(ip);									
 				freeaddrinfo(hostinfov6);
 				return;
 			}
-			
-
+			if (ipversion == IPVersion::Unknown) logger(LogLvl::Error) << "Failed to determine IpVersion!";
 		}
 		IPEndpoint::IPEndpoint(sockaddr* aAddr)
 		{
@@ -72,7 +77,7 @@ namespace En3rN
 				port = ntohs(addrv4->sin_port);
 				ip.resize(16);
 				inet_ntop(AF_INET, &addrv4->sin_addr, &ip[0], 16);
-				//Helpers::trim(ip);
+				Helpers::trim(ip);
 				hostname = ip;
 			}
 			else //IPv6
@@ -82,7 +87,7 @@ namespace En3rN
 				port = ntohs(addrv6->sin6_port);
 				ip.resize(46);
 				inet_ntop(AF_INET6, &addrv6->sin6_addr, &ip[0], 46);
-				//Helpers::trim(ip);				
+				Helpers::trim(ip);				
 				hostname = ip;
 			}
 		}
@@ -108,7 +113,7 @@ namespace En3rN
 			assert(ipversion == IPVersion::IPv4);
 			sockaddr_in addr = {};
 			addr.sin_family = AF_INET;
-			//std::string ipBytes = Helpers::Filter(ip, '.');
+			/*std::string ipBytes = Helpers::Filter(ip, '.');*/
 			inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
 			//memcpy(&addr.sin_addr, &ipBytes[0], sizeof(ULONG));
 			addr.sin_port = htons(port);
@@ -120,7 +125,7 @@ namespace En3rN
 			assert(ipversion == IPVersion::IPv6);
 			sockaddr_in6 addr = {};
 			addr.sin6_family = AF_INET6;
-			inet_pton(AF_INET6, ip.c_str(), &addr.sin6_addr);
+			inet_pton(AF_INET6, ip.c_str(), &addr.sin6_addr);			
 			addr.sin6_port = htons(port);
 			return addr;
 		}

@@ -2,6 +2,7 @@
 #include "logger.h"
 #include <typeinfo>
 #include <memory>
+#include <assert.h>
 
 namespace En3rN
 {
@@ -54,6 +55,7 @@ namespace En3rN
 		}
 		uint16_t Packet::Size()
 		{
+			//assert(body.size() > 3)
 			return (*(uint16_t*)&body[2]);
 		}
 
@@ -91,13 +93,15 @@ namespace En3rN
 
 		void Packet::WriteHeader()
 		{
+			assert(body.size() > sizeof(header.type) + sizeof(header.packetSize) + sizeof(header.itemcount));
 			memcpy(body.data(),													&header.type,			sizeof(header.type));
 			memcpy(body.data()+ sizeof(header.type),							&header.packetSize,		sizeof(header.packetSize));
-			memcpy(body.data()+ sizeof(header.type)+ sizeof(header.packetSize), &header.itemcount,		sizeof(header.itemcount));
+			memcpy(body.data()+ sizeof(header.type)+ sizeof(header.packetSize), &header.itemcount,		sizeof(header.itemcount));			
 		}
 
 		void Packet::ReadHeader()
 		{
+			assert(body.size() > sizeof(header.type) + sizeof(header.packetSize) + sizeof(header.itemcount));
 			memcpy(&header.type,		body.data(),													sizeof(header.type));
 			memcpy(&header.packetSize,	body.data() + sizeof(header.type),								sizeof(header.packetSize));
 			memcpy(&header.itemcount,	body.data() + sizeof(header.type) + sizeof(header.packetSize),  sizeof(header.itemcount));
@@ -163,84 +167,3 @@ namespace En3rN
 		}
 	}
 }
-
-
-//template Packet& Packet::operator<< <char>					(char data);
-//template Packet& Packet::operator<< <unsigned char>			(unsigned char data);
-//template Packet& Packet::operator<< <short>					(short data);
-//template Packet& Packet::operator<< <unsigned short>		(unsigned short data); 
-//template Packet& Packet::operator<< <int>					(int data);
-//template Packet& Packet::operator<< <unsigned int>			(unsigned int data);
-//template Packet& Packet::operator<< <long>					(long data);
-//template Packet& Packet::operator<< <unsigned long>			(unsigned long data);
-//template Packet& Packet::operator<< <long long>				(long long data);
-//template Packet& Packet::operator<< <unsigned long long>	(unsigned long long	data);
-//template Packet& Packet::operator<< <float>					(float data);
-//template Packet& Packet::operator<< <double>				(double data);
-//
-//template <typename t>
-//Packet& Packet::operator<< (t data)
-//{
-//	ItemType itemtype = SetType(data);
-//	if (itemtype != ItemType::String)
-//	{		
-//		uint16_t nsize = 0;
-//		nsize = sizeof(t);
-//		uint8_t itemType = (uint8_t)itemtype;
-//		Append(&itemtype, sizeof(uint8_t));
-//		Append(&nsize, sizeof(uint16_t));
-//		Append(&data, sizeof(t));
-//		uint16_t* pItemCount = (uint16_t*)buffer.data() + 1;
-//		*pItemCount = (uint16_t)((ItemCount() + 1));
-//	}
-//	return *this;
-//}
-
-//template Packet& Packet::operator>> <char>					(char& data);
-//template Packet& Packet::operator>> <unsigned char>			(unsigned char& data);
-//template Packet& Packet::operator>> <short>					(short& data);
-//template Packet& Packet::operator>> <unsigned short>		(unsigned short& data);
-//template Packet& Packet::operator>> <int>					(int& data);
-//template Packet& Packet::operator>> <unsigned int>			(unsigned int& data);
-//template Packet& Packet::operator>> <long>					(long& data);
-//template Packet& Packet::operator>> <unsigned long>			(unsigned long& data);
-//template Packet& Packet::operator>> <long long>				(long long& data);
-//template Packet& Packet::operator>> <unsigned long long>	(unsigned  long long& data);
-//template Packet& Packet::operator>> <float>					(float& data);
-//template Packet& Packet::operator>> <double>				(double& data);
-//
-//template <typename t>
-//Packet& Packet::operator>>(t& data)
-//{
-//	//if (typeid(t) == typeid(std::string)) return *this;
-//
-//	while (Offset < buffer.size())
-//	{
-//
-//		ItemType itemFromBufType = GetType(Offset);
-//		ItemType outputType = SetType(data);
-//		uint16_t size = GetItemSize(Offset);
-//		if (outputType == itemFromBufType)
-//		{
-//			data = GetIntegralItem<t>(Offset);
-//			uint8_t* itemtype = (uint8_t*)buffer.data() + Offset;
-//			*itemtype = (uint8_t)ItemType::Extracted;
-//			return *this;
-//		}
-//		Offset += ItemHeaderSize + size;
-//	}
-//	logger(LogLvl::Error) << "Type[" << typeid(t).name() <<"] not found in packet";
-//	return *this;
-//}
-
-//Packet::Packet()
-//{
-//	Clear();
-//	buffer.resize(sizeof(header));
-//	socket = INVALID_SOCKET;
-//	header.type = PacketType::Message;
-//	header.packetSize = (sizeof(header));
-//	header.itemcount = 0;
-//	memcpy(&buffer[0], &header, sizeof(header));
-//}
-

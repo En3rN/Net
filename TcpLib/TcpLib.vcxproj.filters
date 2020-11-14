@@ -68,9 +68,6 @@
     <ClInclude Include="Packet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MyFDS.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="tsQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>

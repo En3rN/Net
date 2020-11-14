@@ -14,11 +14,11 @@ namespace En3rN
             Create();
         }
 
-        Socket::Socket(IPVersion aIpv, SocketHandle&& aHandle) : ipVersion(aIpv), handle(std::move(aHandle))
+        Socket::Socket(IPVersion ipVersion) 
         {
             logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
-            aHandle = INVALID_SOCKET;
-            Create();
+            handle = INVALID_SOCKET;
+            Create(ipVersion);
         }
 
         /*Socket::Socket(Socket&& other)
@@ -33,7 +33,7 @@ namespace En3rN
         {
             logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
             Close();
-            ipVersion = std::move(other.ipVersion);
+            //ipVersion = std::move(other.ipVersion);
             handle = std::move(other.handle);
             other.handle = INVALID_SOCKET;
             return *this;
@@ -43,7 +43,7 @@ namespace En3rN
         Socket::Socket(Socket&& other) noexcept
         {
             logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
-            ipVersion = std::move(other.ipVersion);
+            //ipVersion = std::move(other.ipVersion);
             handle = std::move(other.handle);
             other.handle = INVALID_SOCKET;
         }
@@ -52,11 +52,7 @@ namespace En3rN
         {
             logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
             if (handle != INVALID_SOCKET)
-            {
-                logger(LogLvl::Debug) << "Closing Socket [" << handle << "] " << closesocket(handle) << " Err: " << WSAGetLastError();
-                
-            }
-
+                logger(LogLvl::Info) << "Closing Socket [" << handle << "] " << closesocket(handle) << " Error: " << WSAGetLastError();
         }
 
         int Socket::SetOption(SocketOption option, BOOL value)
@@ -80,28 +76,29 @@ namespace En3rN
             }
             if (result != 0)
             {
-                logger(LogLvl::Error) << "Error setting options!" << WSAGetLastError();
+                logger(LogLvl::Error) << "Error setting options! Option[" << (int)option << ','<< value<< "]["<< WSAGetLastError()<< ']';
                 return result;
             }
             return 0;
         }
         
 
-        int Socket::Create()
+        int Socket::Create(IPVersion IpVersion)
         {
             if (handle == INVALID_SOCKET)
             {
-                handle = socket((ipVersion == IPVersion::IPv4) ? AF_INET : AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+                handle = socket((IpVersion == IPVersion::IPv4) ? AF_INET : AF_INET6, SOCK_STREAM, IPPROTO_TCP);
                 if (handle == INVALID_SOCKET)
                 {
                     logger(LogLvl::Error) << "Error creating socket";
                     return -1;
                 }
-                logger(LogLvl::Info) << "Socket created!";
-                SetOption(SocketOption::TCP_Nodelay, TRUE);
-                SetOption(SocketOption::NonBlocking, TRUE);
-                if(ipVersion==IPVersion::IPv6) SetOption(SocketOption::IPv6_Only, FALSE);
             }
+            logger(LogLvl::Info) << "Socket created!";
+            SetOption(SocketOption::TCP_Nodelay, TRUE);
+            SetOption(SocketOption::NonBlocking, TRUE);
+            //if(ipVersion==IPVersion::IPv6) SetOption(SocketOption::IPv6_Only, FALSE);
+            
             return 0;
         }
 

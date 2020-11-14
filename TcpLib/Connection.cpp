@@ -14,6 +14,7 @@ namespace En3rN
             pFd = { socket.handle,POLLRDNORM,0 };
             if (type == Type::Listener) { Bind(); Listen(); }
             if (type == Type::Connecter) {Connect();}
+            endpoint.Print();
         }
 
         En3rN::Net::Connection::~Connection()
@@ -114,21 +115,18 @@ namespace En3rN
 
         int En3rN::Net::Connection::Connect()
         {
+            socket.SetOption(SocketOption::NonBlocking, FALSE);
             if (endpoint.GetIPVersion() == IPVersion::IPv4)
-            {
-                socket.SetOption(SocketOption::NonBlocking, FALSE);
+            {                
                 sockaddr_in hint = endpoint.GetSockaddrIPv4();
                 if (connect(socket.handle, (sockaddr*)&hint, sizeof(hint)) == -1)
                 {
                     logger(LogLvl::Error) << "Failed to connect to Server: " << endpoint.GetIP() << ":" << endpoint.GetPort()<<" " << WSAGetLastError();
-                    WSACleanup();
-                    return WSAGetLastError();
+                    return -1;
                 }
                 else
                 {
                     logger(LogLvl::Info) << "Connected to " << endpoint.GetIP() << ":" << endpoint.GetPort();
-                    socket.SetOption(SocketOption::NonBlocking, TRUE);
-                    connected = true;
                 }
             }
             else
@@ -136,80 +134,108 @@ namespace En3rN
                 sockaddr_in6 hint = endpoint.GetSockaddrIPv6();
                 if (connect(socket.handle, (sockaddr*)&hint, sizeof(hint)) == -1)
                 {
-                    logger(LogLvl::Error) << "Failed to connect to Server: " << endpoint.GetIP() << ":" << endpoint.GetPort();
-                    WSACleanup();
-                    return WSAGetLastError();
+                    logger(LogLvl::Error) << "Failed to connect to Server: " << endpoint.GetIP() << ":" << endpoint.GetPort() << " " << WSAGetLastError();                    
+                    return -1;
                 }
                 else
                 {
                     logger(LogLvl::Info) << "Connected to " << endpoint.GetIP() << ":" << endpoint.GetPort();
                 }
-
             }
+            connected = true;
+            socket.SetOption(SocketOption::NonBlocking, TRUE);
             return 0;
         }
 
         std::shared_ptr<Connection> En3rN::Net::Connection::Accept()
         {
             //accept
-            SOCKADDR_IN client;
-            int clientSize = sizeof(client);
-            Socket clientSocket(accept(socket.handle, (sockaddr*)&client, &clientSize));
-            IPEndpoint clientend = IPEndpoint((sockaddr*)&client);
-
-            std::shared_ptr<Connection> newclient = std::make_shared<Connection>(Type::Accepted, std::move(clientSocket), std::move(clientend),outPacketQue, incPacketQue);
-
-            char host[NI_MAXHOST];
-            char service[NI_MAXHOST];
-
-            ZeroMemory(host, NI_MAXHOST);
-            ZeroMemory(service, NI_MAXHOST);
-
-            if (getnameinfo((sockaddr*)&client, clientSize, host, NI_MAXHOST, service, NI_MAXHOST, 0) == 0)
-                //newclient->SetHost(host);
-                logger(LogLvl::Info) << host << " connected on port " << service;
-            else
+            std::shared_ptr<Connection> newClient;
+            if (GetIpVersion() == IPVersion::IPv4)
             {
-                inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
-                logger(LogLvl::Info) << host << " conncted on port " << ntohs(client.sin_port);
+                sockaddr_in client;
+                int clientSize = sizeof(client);
+                SocketHandle sock = accept(socket.handle, (sockaddr*)&client, &clientSize);
+                newClient = std::make_shared<Connection>
+                    (Type::Accepted, std::move(sock), IPEndpoint((sockaddr*)&client), outPacketQue, incPacketQue);
+
+                char host[NI_MAXHOST];
+                char service[NI_MAXHOST];
+
+                ZeroMemory(host, NI_MAXHOST);
+                ZeroMemory(service, NI_MAXSERV);
+
+                if (getnameinfo((sockaddr*)&client, clientSize, host, NI_MAXHOST, service, NI_MAXSERV, 0) == 0)                    
+                    logger(LogLvl::Info) << host << " connected on port " << service;
+                else
+                {
+                    inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
+                    logger(LogLvl::Info) << host << " conncted on port " << ntohs(client.sin_port);
+                }
+                newClient->endpoint.hostname = host;
             }
+            
+            if (GetIpVersion() == IPVersion::IPv6)
+            {
+                sockaddr_in6 client;
+                int clientSize = sizeof(client); 
+                SocketHandle sock = accept(socket.handle, (sockaddr*)&client, &clientSize);
+
+                newClient = std::make_shared<Connection>
+                    (Type::Accepted,std::move(sock), IPEndpoint((sockaddr*)&client), outPacketQue, incPacketQue);
+
+                char host[NI_MAXHOST];
+                char service[NI_MAXHOST];
+
+                ZeroMemory(host, NI_MAXHOST);
+                ZeroMemory(service, NI_MAXSERV);
+
+                if (getnameinfo((sockaddr*)&client, clientSize, host, NI_MAXHOST, service, NI_MAXSERV, 0) == 0)                    
+                    logger(LogLvl::Info) << host << " connected on port " << service;
+                else
+                {
+                    inet_ntop(AF_INET, &client.sin6_addr, host, NI_MAXHOST);
+                    logger(LogLvl::Info) << host << " conncted on port " << ntohs(client.sin6_port);
+                }
+                newClient->endpoint.hostname = host;
+            }
+            
+            
             //welcome msg
-            Packet packet(newclient);
+            Packet packet(newClient);
             std::string msg = "[Server]Welcome to En3rN Server";            
             packet << msg;
             outPacketQue << std::move(packet);
-            Packet pid(newclient, PacketType::ClientID);
-            pid << newclient->id;
+            Packet pid(newClient, PacketType::ClientID);
+            pid << newClient->id;
             outPacketQue << std::move(pid);
-            return newclient;
+            return newClient;
         }
 
         int En3rN::Net::Connection::Bind()
-        {
+        {            
 
             if (endpoint.GetIPVersion() == IPVersion::IPv4)
             {
                 sockaddr_in hint = endpoint.GetSockaddrIPv4();
                 if (bind(socket.handle, (sockaddr*)&hint, sizeof(hint)) == SOCKET_ERROR)
                 {
-                    logger(LogLvl::Error) << "Connection : BIND : Failed" << WSAGetLastError();
-                    WSACleanup();
-                    return WSAGetLastError();
-                }
-                logger(LogLvl::Info) << "Connection : BIND : Success";
+                    logger(LogLvl::Error) << "Connection : BIND : Failed" << WSAGetLastError();                    
+                    return -1;
+                }                
             }
             else
             {
                 sockaddr_in6 hint = endpoint.GetSockaddrIPv6();
+                socket.SetOption(SocketOption::IPv6_Only, FALSE);
                 if (bind(socket.handle, (sockaddr*)&hint, sizeof(hint)) == SOCKET_ERROR)
                 {
-                    logger(LogLvl::Error) << "Connection : BIND : Failed" << WSAGetLastError();
-                    WSACleanup();
-                    return WSAGetLastError();
-                }
-                logger(LogLvl::Info) << "Connection : BIND : Success";
+                    logger(LogLvl::Error) << "Connection : BIND : Failed" << WSAGetLastError();                    
+                    return -1;
+                }               
             }
 
+            logger(LogLvl::Info) << "Connection : BIND : Success";            
             return 0;
         }
 
@@ -220,7 +246,7 @@ namespace En3rN
                 logger(LogLvl::Error) << "Connection : LISTEN : Failed" << WSAGetLastError();
                 return -1;
             }
-            logger(LogLvl::Info) << "Connection : LISTEN : Success";
+            logger(LogLvl::Info) << "Connection : LISTEN : Success";            
             connected = true;
             return 0;
         }
@@ -228,8 +254,7 @@ namespace En3rN
         int En3rN::Net::Connection::Disconnect(const std::string& reason)
         {            
             connected = false;            
-            logger(LogLvl::Info) << "Removing Connection [" << id << "] " << reason;
-            //socket.Close();            
+            logger(LogLvl::Info) << "Removing Connection [" << id << "] " << reason;                       
             return 0;
         }
 
@@ -249,10 +274,10 @@ namespace En3rN
             return uint16_t(id);
         }
 
-        std::string En3rN::Net::Connection::UserName()
+        std::string& En3rN::Net::Connection::UserName()
         {
 
-            return std::string(user.Name);
+            return user.Name;
         }
 
         pollfd& En3rN::Net::Connection::PollFD()
@@ -262,6 +287,10 @@ namespace En3rN
         Connection::Type Connection::GetType()
         {
             return type;
+        }
+        IPVersion Connection::GetIpVersion()
+        {
+            return endpoint.GetIPVersion();
         }
         void Connection::SetID(uint16_t aid)
         {

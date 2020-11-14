@@ -22,20 +22,23 @@ namespace En3rN
 			tsQueue<Packet>								incManager;
 			tsQueue<Packet>								outManager;
 
-			void NetworkFrame();
+			int NetworkFrame();
 			int Console();
 			int CloseConnection(int index, const std::string& reason);
 			int SendToAll(Packet& packet, std::shared_ptr<Connection> ignoreClient = nullptr);
+			int GetConnection(uint16_t aID);
+			int GetConnection(std::string& aUserName);
 			
 		public:
 			TcpServer();			
 			virtual ~TcpServer();			
-			virtual bool onClientConnect();
-			virtual bool onClientDisconnect();
-			virtual bool OnUserUpdate(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients);			
+			virtual int onClientConnect();
+			virtual int onClientDisconnect();
+			virtual int ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients);	
+			int SendData(Packet& packet);
 			int Init();
 			int Start();
-			void Stop();
+			int Stop();
 
 		};
 	}

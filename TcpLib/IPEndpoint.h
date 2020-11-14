@@ -10,11 +10,12 @@ namespace En3rN
 	{
 		enum class IPVersion
 		{
-			IPv4,IPv6
+			Unknown,IPv4,IPv6
 		};
 
 		class IPEndpoint
 		{
+			friend class Connection;
 		public:
 			IPEndpoint() {};
 			IPEndpoint(const char* aip, unsigned short aport);
@@ -27,8 +28,8 @@ namespace En3rN
 			sockaddr_in6 GetSockaddrIPv6();
 			void Print();
 		private:
-			IPVersion ipversion = IPVersion::IPv4;
-			std::string ip = "0.0.0.0";
+			IPVersion ipversion = IPVersion::Unknown;
+			std::string ip = "";
 			std::string hostname = "";			
 			uint16_t  port = 50000;
 		};

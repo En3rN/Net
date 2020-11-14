@@ -23,14 +23,41 @@ namespace En3rN
     {
         TcpServer::TcpServer() 
         {
-            settings.ip = "0.0.0.0";
-            settings.port = 50000;
-            settings.consoleThread = true;
-            settings.networkThread = true;
-            settings.loop = true;
-            settings.timeout = 5;
+            settings.ip = "0.0.0.0";                 // will accept from all ipv4
+            settings.port = 50000;              // port to listen
+            settings.consoleThread = true;      // console cin on a own thread
+            settings.networkThread = true;      // networkthread looping in background -- accepting/ recving / sending
+            settings.loop = true;               // main thread loops within run()
+            settings.timeout = 5;               // timeout on wsapoll ms
+
+            //init winsock
+            logger(LogLvl::Info) << "Initializing Server";
+            Network::StartupWinsock();
+
+            //create listening connection
+            IPEndpoint endP(settings.ip, settings.port);
+            Socket socket(endP.GetIPVersion());
+            connections.emplace_back(std::make_shared<Connection>(Connection::Type::Listener,
+                std::move(socket), std::move(endP),outManager, incManager));
+            if (!connections[0]->IsConnected())
+            {
+                logger(LogLvl::Error) << "Failed to initialize";
+                return;
+            }
+            else
+            {
+                pollFDS.push_back(connections[0]->PollFD());
+                m_running = true;
+            }
+            return;
         };
-        TcpServer::~TcpServer() { Stop(); };
+        TcpServer::~TcpServer() 
+        {
+            while (settings.networkThread) {}; // wait for networkThread to finish
+            // close connections
+            connections.clear();
+            Network::ShutDownWinsock();
+        };
 
         int TcpServer::Init()
         {
@@ -39,7 +66,10 @@ namespace En3rN
             Network::StartupWinsock();
 
             //create listening connection
-            connections.emplace_back(std::make_shared<Connection>(Connection::Type::Listener, Socket(),IPEndpoint(settings.ip, settings.port),outManager, incManager));
+            connections.emplace_back(std::make_shared<Connection>(Connection::Type::Listener, 
+                Socket(),
+                IPEndpoint(settings.ip, settings.port),
+                outManager, incManager));
             if (!connections[0]->IsConnected())
             {
                 logger(LogLvl::Error) << "Failed to initialize";                
@@ -53,19 +83,22 @@ namespace En3rN
             return 0;
         }
 
-        bool TcpServer::OnUserUpdate(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients)
+        int TcpServer::ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients)
         {
             while (!incManager.Queue.empty())
             {
                 Packet packet = std::move(incManager.PopBack());
                 std::string str;
+                std::vector<std::string> vStr;
                 Packet response;
+
                 //todo find out what server needs to do with msg
-                logger(LogLvl::Info) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
+                logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
                 switch (packet.header.type)
                 {
                 case PacketType::Message:
                     packet >> str;
+                    vStr= Helpers::Split(str,' ');
                     
                     if (str.find("all", 0) != str.npos)
                     {
@@ -77,22 +110,26 @@ namespace En3rN
                     }
                     else
                     {//TODO find correct connection to send to
+                        bool foundClient = false;
 
                         for (auto client : clients)
                         {
                             if (client->GetType() == Connection::Type::Listener) continue;
-                            if (str.find(client->UserName(), 0) != str.npos || str.find(std::to_string(client->ID()),6) != str.npos)
+                            if (vStr[1]==client->UserName() || vStr[1] == std::to_string(client->ID()))
                             {
+                                vStr.erase(vStr.begin() + 1);
+                                str = Helpers::Join(vStr, ' ');
                                 logger(LogLvl::Info) << packet.address->UserName() << " " << str;
-                                packet.address = client->shared_from_this();
-                                outManager << std::move(packet);
+                                response << str;
+                                response.address = client->shared_from_this();
+                                outManager << std::move(response);
+                                foundClient = true;
                                 break;
                             }
                         }                            
-                        logger(LogLvl::Warning) << "Could not find receiver!";
+                        if (!foundClient) logger(LogLvl::Warning) << "Could not find receiver!";
                         break;
-                    }
-                    
+                    }                    
                     break;
                 case PacketType::Command:
                     //TODO implement commands for server
@@ -104,16 +141,20 @@ namespace En3rN
                     else
                         outManager << packet;
                     break;
-                }
-                logger(LogLvl::Info) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
+                }                
             }
-            return true;
+            return 0;
+        }
+
+        int TcpServer::SendData(Packet& packet)
+        {
+            outManager << packet;
+            return 0;
         }
 
         int TcpServer::Start()
         {
-            logger(LogLvl::Info) << "Starting Server";
-            if (m_running != true) Stop();
+            logger(LogLvl::Info) << "Starting Server";            
 
             if (settings.networkThread)
             {
@@ -132,29 +173,25 @@ namespace En3rN
 
             if (settings.loop && m_running)
             {
-                while (OnUserUpdate(incManager, outManager, connections) && m_running) {}
+                while (ProcessPackets(incManager, outManager, connections)==0 && m_running) {}
                 m_running = false;                
             }
             return 0;
         }
-        bool TcpServer::onClientDisconnect()
+        int TcpServer::onClientDisconnect()
         {
             return 0;
         }
-        void TcpServer::Stop()
+        int TcpServer::Stop()
         {   
-            while (settings.networkThread) {};            
-            // close sockets
-            connections.clear();
-                
-
-           Network::ShutDownWinsock();
+            m_running = false;
+            return 0;
         }
-        bool TcpServer::onClientConnect()
+        int TcpServer::onClientConnect()
         {
             return 0;
         }
-        void TcpServer::NetworkFrame()
+        int TcpServer::NetworkFrame()
         {
             int result = 0;
             int poll = 0;
@@ -201,7 +238,8 @@ namespace En3rN
                     //TODO:: decide if we want to try again
                 }
             }
-            if (!settings.networkThread && !settings.loop) m_running = OnUserUpdate(incManager, outManager, connections);
+            if (!settings.networkThread && !settings.loop) m_running = ProcessPackets(incManager, outManager, connections);
+            return 0;
         }
         int TcpServer::Console()
         {            
@@ -209,7 +247,7 @@ namespace En3rN
 
             std::cin.getline(buf, sizeof(buf));
             std::string strBuf = buf;
-
+            std::cin.clear();
             if (strBuf == "exit")
             {
                 m_running = false;
@@ -255,6 +293,14 @@ namespace En3rN
                 }
             }
 
+            return 0;
+        }
+        int TcpServer::GetConnection(uint16_t aID)
+        {
+            return 0;
+        }
+        int TcpServer::GetConnection(std::string& aUserName)
+        {
             return 0;
         }
     }

@@ -33,9 +33,10 @@ namespace En3rN
 			int Close();
 			bool IsConnected() const;
 			uint16_t ID();
-			std::string UserName();
+			std::string& UserName();
 			pollfd& PollFD();
 			Type GetType();
+			IPVersion GetIpVersion();
 			void SetID(uint16_t aid);
 
 		public:
