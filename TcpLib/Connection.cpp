@@ -1,4 +1,5 @@
 #include "Connection.h"
+#include <fstream>
 namespace En3rN
 {
     namespace Net
@@ -13,8 +14,7 @@ namespace En3rN
             idCounter++;
             pFd = { socket.handle,POLLRDNORM,0 };
             if (type == Type::Listener) { Bind(); Listen(); }
-            if (type == Type::Connecter) {Connect();}
-            endpoint.Print();
+            if (type == Type::Connecter) {Connect();}            
         }
 
         En3rN::Net::Connection::~Connection()
@@ -73,13 +73,18 @@ namespace En3rN
                 }
                 bytesReceived += bytes;
             }
-            if (packet.Size() > SO_MAX_MSG_SIZE)
+            if (packet.Size() > SO_MAX_MSG_SIZE || packet.Size() < 6)
             {
                 logger(LogLvl::Error) << "Packet header mismath. Size: [" << packet.Size() << "/" << SO_MAX_MSG_SIZE << "]";
-
+                packet.body.resize(SO_MAX_MSG_SIZE);
+                remainingSize = SO_MAX_MSG_SIZE - bytesReceived;
             }
-            packet.body.resize(packet.Size());
-            remainingSize = packet.Size();
+            else
+            {
+                packet.body.resize(packet.Size());
+                remainingSize = packet.Size();
+            }
+            
 
             while (bytesReceived < packet.Size())
             {
@@ -96,12 +101,37 @@ namespace En3rN
                     logger(LogLvl::Error) << "Socket Block: " << WSAGetLastError();
                     return WSAGetLastError();
                 }
+                if (bytes == 0)
+                {
+                    break;
+                }
                 bytesReceived += bytes;
                 
             }
             if (bytesReceived != packet.Size())
             {
-                logger(LogLvl::Error) << "Packet header mismath. Received: [" << bytesReceived << "/"  << packet.Size() << "]";                
+                
+                logger(LogLvl::Error) << "Packet header mismath. Received: [" << bytesReceived << "/" << packet.Size() << "]";
+                std::fstream fs;
+                while (!fs.is_open())
+                {
+                    fs.open("invalidPacketLog.log", std::fstream::app);
+                    if (!fs.is_open())
+                    {
+                        fs.open("invalidPacketLog.log", std::ifstream::out);
+                        fs.close();
+                    }
+                }
+                fs << "Packet from: " << endpoint.ip << " Hostname: " << endpoint.hostname;
+
+                for (auto c : packet.body)
+                {
+                    std::cout << c;
+                    fs << c;
+                }
+                fs << "\r\n";
+                fs.close();
+                
                 return bytes;
             }
             else
@@ -121,28 +151,21 @@ namespace En3rN
                 sockaddr_in hint = endpoint.GetSockaddrIPv4();
                 if (connect(socket.handle, (sockaddr*)&hint, sizeof(hint)) == -1)
                 {
-                    logger(LogLvl::Error) << "Failed to connect to Server: " << endpoint.GetIP() << ":" << endpoint.GetPort()<<" " << WSAGetLastError();
+                    logger(LogLvl::Error) << "Connection : Connect: " << endpoint.ip << ':' << endpoint.port << " : Failed [" << WSAGetLastError() << ']';
                     return -1;
-                }
-                else
-                {
-                    logger(LogLvl::Info) << "Connected to " << endpoint.GetIP() << ":" << endpoint.GetPort();
-                }
+                }                
             }
             else
             {
                 sockaddr_in6 hint = endpoint.GetSockaddrIPv6();
                 if (connect(socket.handle, (sockaddr*)&hint, sizeof(hint)) == -1)
                 {
-                    logger(LogLvl::Error) << "Failed to connect to Server: " << endpoint.GetIP() << ":" << endpoint.GetPort() << " " << WSAGetLastError();                    
+                    logger(LogLvl::Error) << "Connection : Connect: " << endpoint.ip << ':' << endpoint.port << " : Failed [" << WSAGetLastError()<<']';                    
                     return -1;
                 }
-                else
-                {
-                    logger(LogLvl::Info) << "Connected to " << endpoint.GetIP() << ":" << endpoint.GetPort();
-                }
             }
-            connected = true;
+            logger(LogLvl::Info) << "Connection : Connect : " << endpoint.ip << ':' << endpoint.port << " : Success";
+            connected = true;            
             socket.SetOption(SocketOption::NonBlocking, TRUE);
             return 0;
         }
@@ -150,65 +173,56 @@ namespace En3rN
         std::shared_ptr<Connection> En3rN::Net::Connection::Accept()
         {
             //accept
+            SOCKET newSock = INVALID_SOCKET;
             std::shared_ptr<Connection> newClient;
             if (GetIpVersion() == IPVersion::IPv4)
             {
                 sockaddr_in client;
                 int clientSize = sizeof(client);
-                SocketHandle sock = accept(socket.handle, (sockaddr*)&client, &clientSize);
-                newClient = std::make_shared<Connection>
-                    (Type::Accepted, std::move(sock), IPEndpoint((sockaddr*)&client), outPacketQue, incPacketQue);
-
-                char host[NI_MAXHOST];
-                char service[NI_MAXHOST];
-
-                ZeroMemory(host, NI_MAXHOST);
-                ZeroMemory(service, NI_MAXSERV);
-
-                if (getnameinfo((sockaddr*)&client, clientSize, host, NI_MAXHOST, service, NI_MAXSERV, 0) == 0)                    
-                    logger(LogLvl::Info) << host << " connected on port " << service;
-                else
+                newSock = accept(socket.handle, (sockaddr*)&client, &clientSize);
+                if (newSock == INVALID_SOCKET)
                 {
-                    inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
-                    logger(LogLvl::Info) << host << " conncted on port " << ntohs(client.sin_port);
+                    logger(LogLvl::Error) << "Failed to ACCEPT [" << WSAGetLastError() << ']';
+                    return nullptr;
                 }
-                newClient->endpoint.hostname = host;
+                newClient = std::make_shared<Connection>
+                    (Type::Accepted, std::move(newSock), IPEndpoint((sockaddr*)&client), outPacketQue, incPacketQue);
+                char host[NI_MAXHOST];
+                ZeroMemory(host, NI_MAXHOST);
+                if (getnameinfo((sockaddr*)&client, clientSize, host, NI_MAXHOST, NULL, NULL, 0) == 0)
+                    newClient->endpoint.hostname = host;
+                else
+                    logger(LogLvl::Error) << "getnameinfo err [" << WSAGetLastError() << ']';
+
             }
             
             if (GetIpVersion() == IPVersion::IPv6)
             {
                 sockaddr_in6 client;
                 int clientSize = sizeof(client); 
-                SocketHandle sock = accept(socket.handle, (sockaddr*)&client, &clientSize);
-
-                newClient = std::make_shared<Connection>
-                    (Type::Accepted,std::move(sock), IPEndpoint((sockaddr*)&client), outPacketQue, incPacketQue);
-
-                char host[NI_MAXHOST];
-                char service[NI_MAXHOST];
-
-                ZeroMemory(host, NI_MAXHOST);
-                ZeroMemory(service, NI_MAXSERV);
-
-                if (getnameinfo((sockaddr*)&client, clientSize, host, NI_MAXHOST, service, NI_MAXSERV, 0) == 0)                    
-                    logger(LogLvl::Info) << host << " connected on port " << service;
-                else
+                newSock = accept(socket.handle, (sockaddr*)&client, &clientSize);
+                if (newSock == INVALID_SOCKET)
                 {
-                    inet_ntop(AF_INET, &client.sin6_addr, host, NI_MAXHOST);
-                    logger(LogLvl::Info) << host << " conncted on port " << ntohs(client.sin6_port);
+                    logger(LogLvl::Error) << "Failed to ACCEPT [" << WSAGetLastError() << ']';
+                    return nullptr;
                 }
-                newClient->endpoint.hostname = host;
-            }
-            
-            
-            //welcome msg
-            Packet packet(newClient);
-            std::string msg = "[Server]Welcome to En3rN Server";            
-            packet << msg;
-            outPacketQue << std::move(packet);
-            Packet pid(newClient, PacketType::ClientID);
-            pid << newClient->id;
-            outPacketQue << std::move(pid);
+                newClient = std::make_shared<Connection>
+                    (Type::Accepted,std::move(newSock), IPEndpoint((sockaddr*)&client), outPacketQue, incPacketQue);
+                //get hostname
+                char host[NI_MAXHOST];
+                ZeroMemory(host, NI_MAXHOST);
+                if (getnameinfo((sockaddr*)&client, clientSize, host, NI_MAXHOST, NULL, NULL, 0) == 0)
+                    newClient->endpoint.hostname = host;               
+                else
+                    logger(LogLvl::Error) << "getnameinfo err [" << WSAGetLastError() << ']';                
+            }            
+            logger(LogLvl::Info) << newClient->endpoint.hostname << " connected on port " << newClient->endpoint.port;
+            newClient->endpoint.Print();
+
+            //send client ID            
+            Packet IdPacket(newClient, PacketType::ClientID);
+            IdPacket << newClient->id;
+            outPacketQue << std::move(IdPacket);
             return newClient;
         }
 
@@ -230,12 +244,12 @@ namespace En3rN
                 socket.SetOption(SocketOption::IPv6_Only, FALSE);
                 if (bind(socket.handle, (sockaddr*)&hint, sizeof(hint)) == SOCKET_ERROR)
                 {
-                    logger(LogLvl::Error) << "Connection : BIND : Failed" << WSAGetLastError();                    
+                    logger(LogLvl::Error) << "Connection : BIND : Failed [" << WSAGetLastError()<<']';                    
                     return -1;
                 }               
             }
 
-            logger(LogLvl::Info) << "Connection : BIND : Success";            
+            logger(LogLvl::Info) << "Connection : BIND : " << endpoint.ip <<':'<<endpoint.port<< " : Success";            
             return 0;
         }
 
@@ -243,10 +257,10 @@ namespace En3rN
         {
             if (listen(socket.handle, SOMAXCONN) == SOCKET_ERROR)
             {
-                logger(LogLvl::Error) << "Connection : LISTEN : Failed" << WSAGetLastError();
+                logger(LogLvl::Error) << "Connection : LISTEN : Failed [" << WSAGetLastError() << ']';
                 return -1;
             }
-            logger(LogLvl::Info) << "Connection : LISTEN : Success";            
+            logger(LogLvl::Info) << "Connection : LISTEN : " << endpoint.ip << ':' << endpoint.port << " : Success";
             connected = true;
             return 0;
         }
@@ -269,9 +283,9 @@ namespace En3rN
             return connected;
         }
 
-        uint16_t En3rN::Net::Connection::ID()
+        uint16_t & En3rN::Net::Connection::ID()
         {
-            return uint16_t(id);
+            return id;
         }
 
         std::string& En3rN::Net::Connection::UserName()

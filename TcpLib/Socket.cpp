@@ -8,15 +8,13 @@ namespace En3rN
     namespace Net
     {  
         Socket::Socket(SocketHandle&& aHandle) :  handle(std::move(aHandle))
-        {
-            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
+        {            
             aHandle = INVALID_SOCKET;
             Create();
         }
 
         Socket::Socket(IPVersion ipVersion) 
-        {
-            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
+        {            
             handle = INVALID_SOCKET;
             Create(ipVersion);
         }
@@ -31,9 +29,7 @@ namespace En3rN
 
         Socket& Socket::operator=(Socket&& other) noexcept
         {
-            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
-            Close();
-            //ipVersion = std::move(other.ipVersion);
+            Close();            
             handle = std::move(other.handle);
             other.handle = INVALID_SOCKET;
             return *this;
@@ -41,16 +37,13 @@ namespace En3rN
 
 
         Socket::Socket(Socket&& other) noexcept
-        {
-            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
-            //ipVersion = std::move(other.ipVersion);
+        {            
             handle = std::move(other.handle);
             other.handle = INVALID_SOCKET;
         }
 
         Socket::~Socket() 
-        {
-            logger::ScopedSettings loggerSettings = logger::ScopedSettings(LogLvl::Debug, true);
+        {            
             if (handle != INVALID_SOCKET)
                 logger(LogLvl::Info) << "Closing Socket [" << handle << "] " << closesocket(handle) << " Error: " << WSAGetLastError();
         }
@@ -94,11 +87,9 @@ namespace En3rN
                     return -1;
                 }
             }
-            logger(LogLvl::Info) << "Socket created!";
+            logger(LogLvl::Debug) << "Socket created!";
             SetOption(SocketOption::TCP_Nodelay, TRUE);
-            SetOption(SocketOption::NonBlocking, TRUE);
-            //if(ipVersion==IPVersion::IPv6) SetOption(SocketOption::IPv6_Only, FALSE);
-            
+            SetOption(SocketOption::NonBlocking, TRUE);            
             return 0;
         }
 

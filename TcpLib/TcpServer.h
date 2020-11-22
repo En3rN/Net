@@ -5,13 +5,11 @@
 #include "User.h"
 #include "Packet.h"
 #include "tsQueue.h"
-#include "enumclasses.h"
-
 
 namespace En3rN
 {
 	namespace Net
-	{
+	{		
 		class TcpServer
 		{
 		protected:			
@@ -32,9 +30,10 @@ namespace En3rN
 		public:
 			TcpServer();			
 			virtual ~TcpServer();			
-			virtual int onClientConnect();
+			virtual int onClientConnect(std::shared_ptr<Connection> newClient);
 			virtual int onClientDisconnect();
 			virtual int ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients);	
+			bool		Update();
 			int SendData(Packet& packet);
 			int Init();
 			int Start();

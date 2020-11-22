@@ -4,6 +4,8 @@
 #include <WS2tcpip.h>
 #include <string>
 
+
+
 namespace En3rN
 {
 	namespace Net
@@ -27,11 +29,13 @@ namespace En3rN
 			sockaddr_in GetSockaddrIPv4();
 			sockaddr_in6 GetSockaddrIPv6();
 			void Print();
+			void SetHostname();
 		private:
-			IPVersion ipversion = IPVersion::Unknown;
+
+			IPVersion ipversion=IPVersion::Unknown;
 			std::string ip = "";
 			std::string hostname = "";			
-			uint16_t  port = 50000;
+			uint16_t port = 0;
 		};
 	}
 }

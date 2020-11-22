@@ -4,8 +4,8 @@
 #include <string>
 #include "logger.h"
 #include <typeinfo>
-#include "enumclasses.h"
 #include <iterator>
+#include "packettype.h"
 
 
 namespace En3rN
@@ -13,19 +13,6 @@ namespace En3rN
 	namespace Net
 	{	
 		class Connection;
-		enum class PacketType :uint16_t
-		{
-			Message, Command, ClientID
-		};
-
-		/*enum class ItemType : uint16_t
-		{
-			Integral_Char, Integral_UChar, Integral_Short, Integral_UShort,
-			Integral_Int, Integral_UInt, Integral_Long, Integral_ULong,
-			Integral_LongLong, Integral_ULongLong, Integral_Float, Integral_Double,
-			String, Misc, Extracted
-		};*/
-				
 		
 		struct Header
 		{
@@ -39,17 +26,11 @@ namespace En3rN
 			size_t type{};
 			uint16_t size=0;
 		};
-
-		template <typename t>
-		struct Item
-		{
-			ItemHeader header;
-			t data;
-		};
+		
 
 		/*buffer will be stored like this:
 		{
-		2 byte Packet type
+		2 byte CustomPacket type		
 		2 bytes totalsize
 		2 bytes number of items
 		}header
@@ -60,7 +41,7 @@ namespace En3rN
 
 		*/
 		
-
+		
 		class Packet
 		{			
 		public:

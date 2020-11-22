@@ -12,7 +12,7 @@
 #include <assert.h>
 #include "Packet.h"
 #include <mutex>
-#include "enumclasses.h"
+
 
 
 
@@ -21,36 +21,15 @@ namespace En3rN
 {
     namespace Net
     {
-        TcpServer::TcpServer() 
+        TcpServer::TcpServer()
         {
-            settings.ip = "0.0.0.0";                 // will accept from all ipv4
+            settings.ip = "::";                 // will accept from all ipv4
             settings.port = 50000;              // port to listen
             settings.consoleThread = true;      // console cin on a own thread
             settings.networkThread = true;      // networkthread looping in background -- accepting/ recving / sending
             settings.loop = true;               // main thread loops within run()
-            settings.timeout = 5;               // timeout on wsapoll ms
-
-            //init winsock
-            logger(LogLvl::Info) << "Initializing Server";
-            Network::StartupWinsock();
-
-            //create listening connection
-            IPEndpoint endP(settings.ip, settings.port);
-            Socket socket(endP.GetIPVersion());
-            connections.emplace_back(std::make_shared<Connection>(Connection::Type::Listener,
-                std::move(socket), std::move(endP),outManager, incManager));
-            if (!connections[0]->IsConnected())
-            {
-                logger(LogLvl::Error) << "Failed to initialize";
-                return;
-            }
-            else
-            {
-                pollFDS.push_back(connections[0]->PollFD());
-                m_running = true;
-            }
-            return;
-        };
+            settings.timeout = 5;               // timeout on wsapoll ms            
+        }
         TcpServer::~TcpServer() 
         {
             while (settings.networkThread) {}; // wait for networkThread to finish
@@ -59,6 +38,13 @@ namespace En3rN
             Network::ShutDownWinsock();
         };
 
+        bool TcpServer::Update()
+        {
+            if (!settings.networkThread) if(!NetworkFrame()) return false;
+            if(ProcessPackets(incManager, outManager, connections)) return false;
+            return true;
+        }
+
         int TcpServer::Init()
         {
             //init winsock
@@ -66,13 +52,15 @@ namespace En3rN
             Network::StartupWinsock();
 
             //create listening connection
-            connections.emplace_back(std::make_shared<Connection>(Connection::Type::Listener, 
-                Socket(),
-                IPEndpoint(settings.ip, settings.port),
-                outManager, incManager));
+            IPEndpoint endP(settings.ip, settings.port);
+            Socket socket(endP.GetIPVersion());
+            connections.emplace_back(std::make_shared<Connection>(Connection::Type::Listener,
+                std::move(socket), std::move(endP), outManager, incManager));
             if (!connections[0]->IsConnected())
             {
-                logger(LogLvl::Error) << "Failed to initialize";                
+                logger(LogLvl::Error) << "Failed to initialize";
+                settings.networkThread = false;
+                settings.consoleThread = false;
                 return -1;
             }
             else
@@ -137,7 +125,7 @@ namespace En3rN
                     break;
                 default:
                     if (packet.address == nullptr)
-                        logger(LogLvl::Warning) << "Unknown PackeTtype! deleting!";
+                        logger(LogLvl::Warning) << "Unknown PacketType! deleting!";
                     else
                         outManager << packet;
                     break;
@@ -187,8 +175,13 @@ namespace En3rN
             m_running = false;
             return 0;
         }
-        int TcpServer::onClientConnect()
+        int TcpServer::onClientConnect(std::shared_ptr<Connection> newClient)
         {
+            Packet packet(newClient);
+            std::string msg = "[Server]Welcome to En3rN Server";
+            packet << msg;
+            outManager << std::move(packet);
+
             return 0;
         }
         int TcpServer::NetworkFrame()
@@ -207,9 +200,17 @@ namespace En3rN
                     if(useFDS[i].revents & POLLRDNORM)
                         if (connections[i]->GetType() == Connection::Type::Listener)
                         {
-                            std::shared_ptr<Connection> newConnection = connections[i]->Accept();
-                            pollFDS.emplace_back(newConnection->PollFD());
-                            connections.push_back(newConnection);
+                            std::shared_ptr<Connection> newConnection = connections[i]->Accept();                            
+                            if (onClientConnect(newConnection)==0)
+                            {
+                                pollFDS.emplace_back(newConnection->PollFD());
+                                connections.push_back(newConnection);
+                                Packet clientIds(nullptr, PacketType::ClientID);
+                                for (int i = 1; i < connections.size(); i++)
+                                {
+                                    clientIds << connections[i]->ID();
+                                }
+                            }
                             continue;
                         }
                         else
@@ -238,7 +239,6 @@ namespace En3rN
                     //TODO:: decide if we want to try again
                 }
             }
-            if (!settings.networkThread && !settings.loop) m_running = ProcessPackets(incManager, outManager, connections);
             return 0;
         }
         int TcpServer::Console()
@@ -262,14 +262,18 @@ namespace En3rN
                 {
                     Packet packet(connections[0]->shared_from_this());
                     v[0] = "[Server]";
-                    std::string msg = Helpers::Join(v, ' ');
+                    std::string msg = Helpers::Join(v, ' ');                    
                     packet << msg;
+                    std::string str;
+                    str.resize(packet.Size());
+                    str.assign(packet.body.begin() + 6, packet.body.end());
+                    logger(LogLvl::Warning) <<str;
                     incManager << std::move(packet);
                 }
             }
             catch (const std::exception& err)
             {
-                logger(LogLvl::Error) << err.what() << " Correct syntax: username intPackettype message/instruction ";
+                logger(LogLvl::Error) << err.what() << " Correct syntax: username intPacketType message/instruction ";
             }
                    
             

@@ -30,9 +30,6 @@
     <ClCompile Include="Packet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MyFDS.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Connection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -80,9 +77,6 @@
     <ClInclude Include="Network.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="enumclasses.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="IPEndpoint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -93,6 +87,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AppSettings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="packettype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

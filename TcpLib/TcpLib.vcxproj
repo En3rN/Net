@@ -176,7 +176,6 @@
     </ClCompile>
     <ClCompile Include="IPEndpoint.cpp" />
     <ClCompile Include="logger.cpp" />
-    <ClCompile Include="MyFDS.cpp" />
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="Packet.cpp" />
     <ClCompile Include="Socket.cpp" />
@@ -189,7 +188,7 @@
     <ClInclude Include="BackgroundWorker.h" />
     <ClInclude Include="Connection.h" />
     <ClInclude Include="consolecolor.h" />
-    <ClInclude Include="enumclasses.h" />
+    <ClInclude Include="packettype.h" />
     <ClInclude Include="helpers.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>

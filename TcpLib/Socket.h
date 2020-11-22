@@ -1,5 +1,4 @@
 #pragma once
-#include "enumclasses.h"
 #include "IPEndpoint.h"
 
 typedef SOCKET SocketHandle;

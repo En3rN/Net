@@ -6,29 +6,25 @@ using namespace En3rN::Net;
 namespace En3rN
 {
     namespace Net
-    {
-        int TcpClient::onClientDisconnect()
-        {
-            return 0;
-        }
+    {           
         TcpClient::TcpClient()
         {
-            settings.ip = "gafi";
+            settings.ip = "127.0.0.1";
             settings.port = 50000;
             settings.consoleThread = true;
             settings.networkThread = true;
             settings.loop = true;
-            settings.timeout = 5;
-        };
+            settings.timeout = 10;            
+        }       
 
         TcpClient::~TcpClient() { Stop(); }
 
-        int TcpClient::OnClientConnect()
+        int TcpClient::OnClientConnect(const std::shared_ptr<Connection>& connection)
         {
             return 0;
         }
 
-        int TcpClient::OnClientDisconnect()
+        int TcpClient::OnClientDisconnect(const std::shared_ptr<Connection>& connection)
         {
             return 0;
         }
@@ -68,7 +64,7 @@ namespace En3rN
                 }
                 catch (const std::exception& err)
                 {
-                    logger(LogLvl::Error) << err.what() << "Correct syntax: intPackettype username message/instruction ";
+                    logger(LogLvl::Error) << err.what() << "Correct syntax: intPacketType username message/instruction ";
                 }
                     
             }
@@ -87,6 +83,8 @@ namespace En3rN
             if (!connection->IsConnected())
             {
                 logger(LogLvl::Error) << "Failed to initialize";
+                settings.networkThread = false;
+                settings.consoleThread = false;
                 return -1;
             }
             else
@@ -119,7 +117,7 @@ namespace En3rN
                     packet.address->SetID(id);
                     break;
                 default:
-                    logger(LogLvl::Warning) << "Unknown PackeTtype! deleting!";
+                    logger(LogLvl::Warning) << "Unknown PacketType! deleting!";
 
                     break;
                 }                
@@ -143,13 +141,12 @@ namespace En3rN
                 while (pFd.revents != NULL)
                 {
                     if (pFd.revents & POLLRDNORM)
-                    {
-                        int r = connection->RecvAll();
-                        if (r < 1)  connection->Disconnect("Recv < 1"); 
+                    {                        
+                        if (connection->RecvAll() < 1)  connection->Disconnect("Recv < 1");
                         break;
                     }
-                    if (pFd.revents & POLLERR) { connection->Disconnect("POLLERR"); break; }
-                    if (pFd.revents & POLLHUP) { connection->Disconnect("POLLHUP"); break; }
+                    if (pFd.revents & POLLERR)  { connection->Disconnect("POLLERR"); break; }
+                    if (pFd.revents & POLLHUP)  { connection->Disconnect("POLLHUP"); break; }
                     if (pFd.revents & POLLNVAL) { connection->Disconnect("POLLINVAL"); break; }
 
                     logger(LogLvl::Warning) << "Unhandled Flag! Revents: " << pFd.revents << " On connectionID: " << connection->ID();

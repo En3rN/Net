@@ -32,7 +32,7 @@ namespace En3rN
 			int Disconnect(const std::string& reason);
 			int Close();
 			bool IsConnected() const;
-			uint16_t ID();
+			uint16_t& ID();
 			std::string& UserName();
 			pollfd& PollFD();
 			Type GetType();

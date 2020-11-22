@@ -7,35 +7,39 @@
 namespace En3rN
 {
 	namespace Net
-	{		
-		IPEndpoint::IPEndpoint(const char* aIp, unsigned short aPort) : ip(aIp),hostname(aIp), port(aPort)
-		{	
-			ipversion = IPVersion::Unknown;
-			in_addr addr;
+	{
+		IPEndpoint::IPEndpoint(const char* aIp, unsigned short aPort) : ip(aIp), hostname(aIp), port(aPort)
+		{
+			char host[NI_MAXHOST];
+			ZeroMemory(host, NI_MAXHOST);
+			char ipstringbuffer[46];
+			DWORD ipbufferlength = 46;
+			int i = 1;
+			in_addr addrv4;
+			in6_addr addrv6;			
 			
-			if (inet_pton(AF_INET, aIp, &addr) == 1)
+			if (inet_pton(AF_INET, aIp, &addrv4) == 1)
 			{
 				ipversion = IPVersion::IPv4;
-				if (inet_ntop(AF_INET, &addr.S_un.S_addr, &ip[0], 16) == NULL)
-					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';
+				ip.resize(16);
+				if (inet_ntop(AF_INET, &addrv4, &ip[0], 16) == NULL)
+					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';				
 				return;
 			}
 
-				
-			addrinfo hints = {};
-			hints.ai_family = AF_INET;				
-			addrinfo* hostinfo = nullptr;				
-								
+			addrinfo hints = {}; //hints will filter the results we get back for getaddrinfo
+			hints.ai_family = AF_INET; //ipv4 addresses only
+			addrinfo* hostinfo = nullptr;
 
 			if (getaddrinfo(aIp, NULL, &hints, &hostinfo) == 0)
 			{
 				ipversion = IPVersion::IPv4;
 				sockaddr_in* host_addr = reinterpret_cast<sockaddr_in*> (hostinfo->ai_addr);
 				ip.resize(16);
-				if(inet_ntop(AF_INET, &host_addr->sin_addr, &ip[0], 16)==NULL)
+				if (inet_ntop(AF_INET, &host_addr->sin_addr, &ip[0], 16) == NULL)
 					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';
 				Helpers::trim(ip);				
-				freeaddrinfo(hostinfo);
+				freeaddrinfo(hostinfo);					
 				return;
 			}
 			
@@ -45,14 +49,14 @@ namespace En3rN
 			{
 				ipversion = IPVersion::IPv6;
 				ip.resize(46);
-				if (inet_ntop(AF_INET6, &addr6.u.Byte, &ip[0], 46) == NULL)
-					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';
+				if (inet_ntop(AF_INET6, &addr6, &ip[0], 46) == NULL)
+					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';				
 				return;
 			}
-
 			//Attempt to resolve hostname to ipv6 address
 			addrinfo hintsv6 = {}; //hints will filter the results we get back for getaddrinfo
 			hintsv6.ai_family = AF_INET6; //ipv6 addresses only
+			hintsv6.ai_flags = AI_ALL;
 			addrinfo* hostinfov6 = nullptr;
 
 			if (getaddrinfo(aIp, NULL, &hintsv6, &hostinfov6) == 0)
@@ -62,33 +66,35 @@ namespace En3rN
 				ip.resize(46);
 				if (inet_ntop(AF_INET6, &host_addr->sin6_addr, &ip[0], 46) == NULL)
 					logger(LogLvl::Error) << "inet_ntopErr [" << WSAGetLastError() << ']';
-				Helpers::trim(ip);									
-				freeaddrinfo(hostinfov6);
+				Helpers::trim(ip);				
+				freeaddrinfo(hostinfov6);					
 				return;
 			}
+			
 			if (ipversion == IPVersion::Unknown) logger(LogLvl::Error) << "Failed to determine IpVersion!";
 		}
+
 		IPEndpoint::IPEndpoint(sockaddr* aAddr)
 		{
+			
+
 			if (aAddr->sa_family == AF_INET) //IPv4
 			{
 				sockaddr_in* addrv4 = reinterpret_cast<sockaddr_in*>(aAddr);
 				ipversion = IPVersion::IPv4;
 				port = ntohs(addrv4->sin_port);
 				ip.resize(16);
-				inet_ntop(AF_INET, &addrv4->sin_addr, &ip[0], 16);
-				Helpers::trim(ip);
-				hostname = ip;
+				inet_ntop(AF_INET, &addrv4->sin_addr, &ip[0], 16);							
+				Helpers::trim(ip);				
 			}
 			else //IPv6
 			{
 				sockaddr_in6* addrv6 = reinterpret_cast<sockaddr_in6*>(aAddr);
 				ipversion = IPVersion::IPv6;
-				port = ntohs(addrv6->sin6_port);
+				port = ntohs(addrv6->sin6_port);				
 				ip.resize(46);
-				inet_ntop(AF_INET6, &addrv6->sin6_addr, &ip[0], 46);
+				inet_ntop(AF_INET6, &addrv6->sin6_addr, &ip[0], 46);								
 				Helpers::trim(ip);				
-				hostname = ip;
 			}
 		}
 
@@ -112,10 +118,8 @@ namespace En3rN
 		{
 			assert(ipversion == IPVersion::IPv4);
 			sockaddr_in addr = {};
-			addr.sin_family = AF_INET;
-			/*std::string ipBytes = Helpers::Filter(ip, '.');*/
-			inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
-			//memcpy(&addr.sin_addr, &ipBytes[0], sizeof(ULONG));
+			addr.sin_family = AF_INET;			
+			inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);			
 			addr.sin_port = htons(port);
 			return addr;
 		}
@@ -135,16 +139,34 @@ namespace En3rN
 			switch (ipversion)
 			{
 			case IPVersion::IPv4:
-				std::cout << "IP Version: IPv4" << std::endl;
+				std::cout << "\tIP Version: IPv4" << std::endl;
 				break;
 			case IPVersion::IPv6:
-				std::cout << "IP Version: IPv6" << std::endl;
+				std::cout << "\tIP Version: IPv6" << std::endl;
 				break;
 			default:
-				std::cout << "IP Version: Unknown" << std::endl;
+				std::cout << "\tIP Version: Unknown" << std::endl;
 			}
-			std::cout << "Hostname: " << hostname << std::endl;
-			std::cout << "IP: " << ip << std::endl;
+			std::cout << "\tHostname: " << hostname << std::endl;
+			std::cout << "\tIP: " << ip << std::endl;
+			std::cout << "\tPort: " << port << std::endl;
+		}
+		void IPEndpoint::SetHostname()
+		{
+			char host[NI_MAXHOST];
+			ZeroMemory(host, NI_MAXHOST);
+		
+			sockaddr client;
+			size_t clientSize = ipversion == IPVersion::IPv4 ? sizeof(GetSockaddrIPv4()) : sizeof(GetSockaddrIPv6());
+			client.sa_family = ipversion == IPVersion::IPv4 ? AF_INET : AF_INET6;
+			
+			if (inet_pton(client.sa_family, ip.c_str(), &client.sa_data) == 1)
+			{
+				
+					
+				
+			}
+			logger(LogLvl::Error) << "inet_pton err [" << WSAGetLastError() << ']';
 		}
 	}
 }

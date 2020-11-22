@@ -27,11 +27,11 @@
                 oldLvl = LogLevel;
                 oldHeader = LogHeader;                
                 Settings(loglvl, header);
-                //logger(LogLvl::Info) << "Setting loggersettings: "  << (int)(loglvl) << '/' << header;
+                logger(LogLvl::Info) << "Setting loggersettings: "  << (int)(loglvl) << '/' << header;
             } 
             ~ScopedSettings()
             {
-                //logger(LogLvl::Info) << "ReSetting loggersettings: " << (int)oldLvl << '/' << oldHeader;
+                logger(LogLvl::Info) << "ReSetting loggersettings: " << (int)oldLvl << '/' << oldHeader;
                 Settings(oldLvl, oldHeader);
 
             }

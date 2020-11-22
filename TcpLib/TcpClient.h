@@ -18,13 +18,12 @@ namespace En3rN
 
 
 			tsQueue<Packet>	incManager;
-			tsQueue<Packet>	outManager;
-			int onClientDisconnect();
+			tsQueue<Packet>	outManager;			
 		public:
-			TcpClient();
+			TcpClient();			
 			virtual ~TcpClient();
-			virtual int OnClientConnect();
-			virtual int OnClientDisconnect();
+			virtual int OnClientConnect(const std::shared_ptr<Connection>& connection);
+			virtual int OnClientDisconnect(const std::shared_ptr<Connection>& connection);
 			virtual int ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::shared_ptr<Connection>& connection);			
 			int SendData(Packet& packet);
 			int NetworkFrame();
