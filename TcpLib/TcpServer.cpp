@@ -13,10 +13,6 @@
 #include "Packet.h"
 #include <mutex>
 
-
-
-
-
 namespace En3rN
 {
     namespace Net
@@ -39,10 +35,10 @@ namespace En3rN
         };
 
         bool TcpServer::Update()
-        {
+        {            
             if (!settings.networkThread) if(!NetworkFrame()) return false;
             if(ProcessPackets(incManager, outManager, connections)) return false;
-            return true;
+            return m_running;
         }
 
         int TcpServer::Init()
@@ -71,24 +67,25 @@ namespace En3rN
             return 0;
         }
 
-        int TcpServer::ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients)
+        int TcpServer::ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients)
         {
-            while (!incManager.Queue.empty())
+            while (!incManager.Empty())
             {
                 Packet packet = std::move(incManager.PopBack());
                 std::string str;
                 std::vector<std::string> vStr;
                 Packet response;
 
-                //todo find out what server needs to do with msg
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
-                switch (packet.header.type)
+
+                switch (packet.GetPacketType())
                 {
                 case PacketType::Message:
+
                     packet >> str;
-                    vStr= Helpers::Split(str,' ');
-                    
-                    if (str.find("all", 0) != str.npos)
+                    vStr = Helpers::Split(str, ' ');
+
+                    if (str.find("all ", 0) != str.npos)
                     {
                         str.erase(str.find("all ", 0), 4);
                         response << str;
@@ -103,7 +100,7 @@ namespace En3rN
                         for (auto client : clients)
                         {
                             if (client->GetType() == Connection::Type::Listener) continue;
-                            if (vStr[1]==client->UserName() || vStr[1] == std::to_string(client->ID()))
+                            if (vStr[1] == client->UserName() || vStr[1] == std::to_string(client->ID()))
                             {
                                 vStr.erase(vStr.begin() + 1);
                                 str = Helpers::Join(vStr, ' ');
@@ -114,29 +111,26 @@ namespace En3rN
                                 foundClient = true;
                                 break;
                             }
-                        }                            
+                        }
                         if (!foundClient) logger(LogLvl::Warning) << "Could not find receiver!";
                         break;
-                    }                    
+                    }
                     break;
-                case PacketType::Command:
-                    //TODO implement commands for server
-                    logger(LogLvl::Warning) << "Invalid command! Deleting!";
+
+                case PacketType::HandShake:
+                    packet.address->Validate(packet);
                     break;
                 default:
-                    if (packet.address == nullptr)
-                        logger(LogLvl::Warning) << "Unknown PacketType! deleting!";
-                    else
-                        outManager << packet;
+                    //ProcessPacket(Packet & packet);
                     break;
-                }                
+                }
             }
-            return 0;
+        return 0;
         }
 
         int TcpServer::SendData(Packet& packet)
         {
-            outManager << packet;
+            incManager << packet;
             return 0;
         }
 
@@ -166,7 +160,7 @@ namespace En3rN
             }
             return 0;
         }
-        int TcpServer::onClientDisconnect()
+        int TcpServer::onClientDisconnect(std::shared_ptr<Connection> client)
         {
             return 0;
         }
@@ -188,16 +182,16 @@ namespace En3rN
         {
             int result = 0;
             int poll = 0;
-            std::vector<WSAPOLLFD> useFDS = pollFDS;
+            //std::vector<WSAPOLLFD> useFDS = pollFDS;
             
-            poll = WSAPoll(useFDS.data(), useFDS.size(), settings.timeout);
+            poll = WSAPoll(pollFDS.data(), (ULONG)pollFDS.size(), settings.timeout);
             if (poll > 0)
             {
-                for (auto i = 0; i < useFDS.size(); i++)
-                {
-                    if (useFDS[i].revents == 0) continue;
+                for (auto i = 0; i < pollFDS.size(); i++)
+                {                    
+                    if (pollFDS[i].revents == 0) continue;
                     
-                    if(useFDS[i].revents & POLLRDNORM)
+                    if(pollFDS[i].revents & POLLRDNORM)
                         if (connections[i]->GetType() == Connection::Type::Listener)
                         {
                             std::shared_ptr<Connection> newConnection = connections[i]->Accept();                            
@@ -216,21 +210,22 @@ namespace En3rN
                         else
                         {
                             int r = connections[i]->RecvAll();
-                            if (r < 1) { CloseConnection(i, "Recv" + std::to_string(r)); }          continue;
+                            if (r < 1) { CloseConnection(i, "Recv : " + std::to_string(r)); }          continue;
                         }
 
-                    if (useFDS[i].revents & POLLERR)    { CloseConnection(i, "POLLERR");    continue; }
-                    if (useFDS[i].revents & POLLHUP)    { CloseConnection(i, "POLLHUP");    continue; }
-                    if (useFDS[i].revents & POLLNVAL)   { CloseConnection(i, "POLLINVAL");  continue; }
+                    
+                    if (pollFDS[i].revents & POLLERR)    { CloseConnection(i, "POLLERR");    continue; }
+                    if (pollFDS[i].revents & POLLHUP)    { CloseConnection(i, "POLLHUP");    continue; }
+                    if (pollFDS[i].revents & POLLNVAL)   { CloseConnection(i, "POLLINVAL");  continue; }
                    
-                logger(LogLvl::Warning) << "Unhandled Flag! Revents: "<< useFDS[i].revents <<" On connectionID: " << connections[i]->ID();
+                logger(LogLvl::Warning) << "Unhandled Flag! Revents: "<< pollFDS[i].revents <<" On connectionID: " << connections[i]->ID();
                     
                 }
             }
             if (poll == SOCKET_ERROR) logger(LogLvl::Error) << "PollErr: " << WSAGetLastError();
             
 
-            while (outManager.Queue.size() > 0)
+            while (!outManager.Empty())
             {
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
                 Packet packet = std::move(outManager.PopBack());
@@ -257,33 +252,35 @@ namespace En3rN
             std::vector<std::string> v = Helpers::Split(strBuf, ' ');
                 
             try
-            {
+            {                
                 if ((PacketType)std::stoi(v[0]) == PacketType::Message)
                 {
-                    Packet packet(connections[0]->shared_from_this());
+                    Packet packet;
                     v[0] = "[Server]";
                     std::string msg = Helpers::Join(v, ' ');                    
                     packet << msg;
                     std::string str;
-                    str.resize(packet.Size());
+                    /*str.resize(packet.Size());
                     str.assign(packet.body.begin() + 6, packet.body.end());
-                    logger(LogLvl::Warning) <<str;
+                    logger(LogLvl::Warning) <<str;*/
                     incManager << std::move(packet);
                 }
             }
             catch (const std::exception& err)
             {
-                logger(LogLvl::Error) << err.what() << " Correct syntax: username intPacketType message/instruction ";
+                logger(LogLvl::Error) << err.what() << " Correct syntax: intPacketType  username/VlientID message/instruction ";
             }
                    
             
             return 0;
         }
-        int TcpServer::CloseConnection(int index, const std::string& reason)
+        int TcpServer::CloseConnection(int& index, const std::string& reason)
         {
-            connections[index]->Disconnect(reason);            
+            connections[index]->Disconnect(reason);
+            onClientDisconnect(connections[index]);
             connections.erase(connections.begin() + index);
             pollFDS.erase(pollFDS.begin() + index);
+            index--;
             return 0;
         }
         int TcpServer::SendToAll(Packet& packet, std::shared_ptr<Connection> ignoreClient)
@@ -309,90 +306,3 @@ namespace En3rN
         }
     }
 }
-
-
-//fd_set incSocks;
-            //fd_set outSocks;
-            //fd_set excSocks;
-
-            //SOCKET incSock;
-            //SOCKET outSock;
-            ////SOCKET excSock;
-
-/* incSocks = masterFDS;
-                outSocks = masterFDS;
-                excSocks = masterFDS;*/
-
-                /*if (select(0, &incSocks, nullptr, nullptr, &m_settings.timeout) > 0)
-                {
-                    for (int i = 0; i < incSocks.fd_count; i++)
-                    {
-                        incSock = incSocks.fd_array[i];
-                        if (incSock == m_socket && m_settings.server)
-                            onClientConnect();
-                        else if (incSock != NULL)
-                        {
-                            Packet incPacket(incSock);
-                            ReceiveAll(incSock, incPacket);
-                            incManager << incPacket;
-                        }
-                    }
-                }*/
-
-//int TcpServer::onClientDisconnect(SOCKET& socket)
-    //{
-    //    //drop client
-    //    logger(LogLvl::Info) << socket << " : " << ConnectedUsers[GetUserID(socket)] << " has disconnected!";
-    //    closesocket(socket);
-    //    ConnectedUsers.erase(ConnectedUsers.begin() + GetUserID(socket));
-    //    FD_CLR(socket, &masterFDS);
-    //    return 0;
-        
-
-
-//SOCKET TcpServer::CreateSocket()
-//{
-//    SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
-//    if (s == INVALID_SOCKET)
-//    {
-//        logger(LogLvl::Error) << "Cant create socket";
-//        Stop();
-//    }
-//
-//    sockaddr_in hint;
-//    hint.sin_family = AF_INET;
-//    hint.sin_port = htons(m_settings.port);
-//    // hint.sin_addr.S_un.S_addr = inet_addr(m_settings.ipAddress);
-//    inet_pton(AF_INET, m_settings.ipAddress, &hint.sin_addr);
-//
-//
-//    if (m_settings.server)
-//    {   //tell winsock socket for listening
-//        if (bind(s, (sockaddr*)&hint, sizeof(hint)) == SOCKET_ERROR)
-//        {
-//            logger(LogLvl::Error) << "Cant bind socket" << WSAGetLastError();
-//            Stop();
-//        }
-//        if (listen(s, SOMAXCONN) == SOCKET_ERROR)
-//        {
-//            logger(LogLvl::Error) << "Cant listen @ socket" << WSAGetLastError();
-//            Stop();
-//        }
-//    }
-//    else
-//    {
-//        if (connect(s, (sockaddr*)&hint, sizeof(hint)) == -1)
-//        {
-//            logger(LogLvl::Error) << "Failed to connect to Server: " << m_settings.ipAddress << ":" << m_settings.port;
-//            WSACleanup();
-//            return WSAGetLastError();
-//        }
-//        else
-//        {
-//            logger(LogLvl::Info) << "Connected to " << m_settings.ipAddress << ":" << m_settings.port;
-//        }
-//    }
-//    m_running = true;
-//    return std::move(s);
-//};
-

@@ -10,83 +10,87 @@ namespace En3rN
 	{
 		class Packet;
 		template <typename T>
-		class tsQueue
+		class tsQue
 		{
 		public:
-			tsQueue() = default;
-			tsQueue(tsQueue& other) = delete;
-			virtual ~tsQueue() { Clear(); logger(LogLvl::Debug) << "Queue deleted!"; }
+			tsQue() = default;
+			tsQue(tsQue& other) = delete;
+			virtual ~tsQue() { Clear(); logger(LogLvl::Debug) << "Queue deleted!"; }
 
 
-			std::mutex muxQueue;
-			std::deque<T> Queue;
+			std::mutex muxQue;
+			std::deque<T> que;
 
 
-			tsQueue& operator << (T& item)
+			tsQue& operator << (T& item)
 			{
-				Queue.push_front(item);
+				que.push_front(item);
 				return *this;
 
 			}
 						
-			tsQueue& operator << (T&& item)
+			tsQue& operator << (T&& item)
 			{
-				Queue.push_front(std::move(item));
+				que.push_front(std::move(item));
 				return *this;
 
 			}
 
-			tsQueue& operator >> (tsQueue& other)
+			tsQue& operator >> (tsQue& other)
 			{
 				T item = PopBack();
-				other.Queue.push_front(std::move(item));
+				other.que.push_front(std::move(item));
 				return *this;
 			}
 
 			const T& Front()
 			{
-				std::scoped_lock lock(muxQueue);				
-				return &Queue.front();
+				std::scoped_lock lock(muxQue);				
+				return &que.front();
 			}
 			const T& Back()
 			{
-				std::scoped_lock lock(muxQueue);				
-				return  &Queue.back();
+				std::scoped_lock lock(muxQue);				
+				return  &que.back();
 			}
 
 			T PopFront()
 			{
-				std::scoped_lock lock(muxQueue);
-				T item = std::move(Queue.front());
-				Queue.pop_front();
+				std::scoped_lock lock(muxQue);
+				T item = std::move(que.front());
+				que.pop_front();
 				return item;
 			}
 			T PopBack()
 			{
-				std::scoped_lock lock(muxQueue);
-				T item = std::move(Queue.back());
-				Queue.pop_back();
+				std::scoped_lock lock(muxQue);
+				T item = std::move(que.back());
+				que.pop_back();
 				return item;
 			}
 			void PushFront(T& item)
 			{
-				std::scoped_lock lock(muxQueue);
-				Queue.push_front(std::move(item));
+				std::scoped_lock lock(muxQue);
+				que.push_front(std::move(item));
 			}
 			void PushBack(T& item)
 			{
-				std::scoped_lock lock(muxQueue);
-				Queue.push_back(std::move(item));
+				std::scoped_lock lock(muxQue);
+				que.push_back(std::move(item));
 			}
 
 			size_t Size()
 			{
-				return Queue.size();
+				return que.size();
 			}
 			void Clear()
 			{
-				std::scoped_lock lock(muxQueue);
-				Queue.clear();
+				std::scoped_lock lock(muxQue);
+				que.clear();
+			}
+			bool Empty()
+			{
+				return que.empty();
 			}
 
 		};

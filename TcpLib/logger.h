@@ -23,7 +23,6 @@
         public:
             ScopedSettings(LogLvl loglvl, bool header)
             {
-                
                 oldLvl = LogLevel;
                 oldHeader = LogHeader;                
                 Settings(loglvl, header);
@@ -33,7 +32,6 @@
             {
                 logger(LogLvl::Info) << "ReSetting loggersettings: " << (int)oldLvl << '/' << oldHeader;
                 Settings(oldLvl, oldHeader);
-
             }
         };
         static LogLvl   LogLevel;
@@ -56,6 +54,15 @@
                 std::cout << std::endl;
             }
             m_opened = false;
+        }
+        template <typename t>
+        static std::string Brackets(t msg)
+        {
+            
+            std::stringstream ss;
+            ss << '[' << msg << ']';
+            //std::string str = ss.str();
+            return std::move(ss.str());
         }
         template<typename t>
         logger& operator<<(const t& msg)

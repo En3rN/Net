@@ -17,14 +17,15 @@ namespace En3rN
 			bool										m_running = false;
 
 
-			tsQueue<Packet>	incManager;
-			tsQueue<Packet>	outManager;			
+			tsQue<Packet>	incManager;
+			tsQue<Packet>	outManager;			
 		public:
 			TcpClient();			
 			virtual ~TcpClient();
 			virtual int OnClientConnect(const std::shared_ptr<Connection>& connection);
 			virtual int OnClientDisconnect(const std::shared_ptr<Connection>& connection);
-			virtual int ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::shared_ptr<Connection>& connection);			
+			virtual int ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::shared_ptr<Connection>& connection);
+			bool Update();
 			int SendData(Packet& packet);
 			int NetworkFrame();
 			int Console();

@@ -111,6 +111,17 @@ namespace En3rN
                 trim(s);
                 return s;
             }
+            std::string GenerateKey()
+            {
+                std::string key;
+                srand(time(NULL));
+                for (int i = 0; i < 50; i++)
+                {
+                    char c = (unsigned char)(rand() % 94) + 32;
+                    key += c;
+                }
+                return std::move(key);
+            }
         }
     }
 }

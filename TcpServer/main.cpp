@@ -4,12 +4,13 @@
 #include "Packet.h"
 #include "tsQueue.h"
 #include "Connection.h"
+#include <thread>
 
 using namespace En3rN::Net;
 
 enum class PacketType
 {
-	Message
+	Message, jaja
 };
 
 
@@ -32,11 +33,11 @@ public:
 		TcpServer::onClientConnect(client); // sends out welcome msg;
 		return 0;
 	}
-	virtual int onClientDisconnect() override
+	virtual int onClientDisconnect(std::shared_ptr<Connection> client) override
 	{
 		return 0;
 	}
-	virtual int ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients) override
+	virtual int ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients) override
 	{
 		TcpServer::ProcessPackets(incManager,outManager,clients);
 		return 0;
@@ -48,6 +49,14 @@ int main()
 {
 	MyServer server("0.0.0.0", 50000, true, true, true, 5);
 	if (server.Init() == 0) server.Start();
-	//while (server.Update()) {};	//if main tread not looping
+	while (server.Update()) 
+	{
+		std::string s = "all " +Helpers::GenerateKey();
+		Packet p;
+		p << s;
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		server.SendData(p);
+	
+	};	//if main tread not looping
 	return 0;
 }

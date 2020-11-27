@@ -42,10 +42,10 @@ namespace En3rN
 			logger(LogLvl::Debug) << "Packet moved!";
 			address = other.address;
 			header = other.header;
-			body = other.body;
+			body = std::move(other.body);
 			other.address = nullptr;
-
-			ZeroMemory(&other, sizeof(other));
+			ZeroMemory(&other.header, sizeof(other,header));
+			other.body.clear();
 		}
 		Packet::~Packet()
 		{			

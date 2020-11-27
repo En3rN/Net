@@ -7,7 +7,7 @@ namespace En3rN
 
         uint16_t En3rN::Net::Connection::idCounter = 1000;
 
-        En3rN::Net::Connection::Connection(Type aType, Socket&& aSocket, IPEndpoint&& aEndpoint, tsQueue<Packet>& aOutManager,tsQueue<Packet>& aIncManager) :
+        En3rN::Net::Connection::Connection(Type aType, Socket&& aSocket, IPEndpoint&& aEndpoint, tsQue<Packet>& aOutManager,tsQue<Packet>& aIncManager) :
             type(aType), socket(std::move(aSocket)), endpoint(std::move(aEndpoint)),outPacketQue(aOutManager), incPacketQue(aIncManager)
         {
             id = idCounter;
@@ -72,7 +72,7 @@ namespace En3rN
                     return WSAGetLastError();
                 }
                 bytesReceived += bytes;
-            }
+            }            
             if (packet.Size() > SO_MAX_MSG_SIZE || packet.Size() < 6)
             {
                 logger(LogLvl::Error) << "Packet header mismath. Size: [" << packet.Size() << "/" << SO_MAX_MSG_SIZE << "]";
@@ -80,7 +80,7 @@ namespace En3rN
                 remainingSize = SO_MAX_MSG_SIZE - bytesReceived;
             }
             else
-            {
+            {               
                 packet.body.resize(packet.Size());
                 remainingSize = packet.Size();
             }
@@ -108,9 +108,10 @@ namespace En3rN
                 bytesReceived += bytes;
                 
             }
+            if (bytesReceived < 6) return 0;
+            if (stage > ValidationStage::NotStarted && stage<ValidationStage::Validated) Validate(packet);
             if (bytesReceived != packet.Size())
             {
-                
                 logger(LogLvl::Error) << "Packet header mismath. Received: [" << bytesReceived << "/" << packet.Size() << "]";
                 std::fstream fs;
                 while (!fs.is_open())
@@ -193,7 +194,6 @@ namespace En3rN
                     newClient->endpoint.hostname = host;
                 else
                     logger(LogLvl::Error) << "getnameinfo err [" << WSAGetLastError() << ']';
-
             }
             
             if (GetIpVersion() == IPVersion::IPv6)
@@ -219,10 +219,19 @@ namespace En3rN
             logger(LogLvl::Info) << newClient->endpoint.hostname << " connected on port " << newClient->endpoint.port;
             newClient->endpoint.Print();
 
-            //send client ID            
-            Packet IdPacket(newClient, PacketType::ClientID);
+            //start handShake
+            
+            std::string key = Helpers::GenerateKey();            
+            std::string encryptedKey=Encrypt(key);
+            newClient->handshake = encryptedKey;
+            newClient->stage = ValidationStage::Started;
+            Packet phandshake(newClient, PacketType::HandShake);
+            phandshake << key;
+            outPacketQue << phandshake;            
+            
+            /*Packet IdPacket(newClient, PacketType::ClientID);
             IdPacket << newClient->id;
-            outPacketQue << std::move(IdPacket);
+            outPacketQue << std::move(IdPacket);*/
             return newClient;
         }
 
@@ -283,6 +292,12 @@ namespace En3rN
             return connected;
         }
 
+        bool Connection::IsValidated() const
+        {
+            if (stage == ValidationStage::Validated) return true;
+            return false;
+        }
+
         uint16_t & En3rN::Net::Connection::ID()
         {
             return id;
@@ -310,6 +325,37 @@ namespace En3rN
         {
             logger(LogLvl::Debug) << "Setting clientID: " << aid;
             id = aid;
+        }
+        std::string Connection::Encrypt(std::string& data)
+        {
+            std::string encrypted;
+            char ec{};
+            for (auto c : data)
+            {
+                ec = c ^ '$';
+                encrypted += ec;
+            }
+            return std::move(encrypted);
+        }
+        Connection::ValidationStage Connection::Validate(Packet& packet)
+        {           
+            if (packet.GetPacketType() != PacketType::HandShake)
+            {
+                connected = false;                
+                return ValidationStage::NotValidated;
+            }
+            std::string answear;
+            packet >> answear;
+            if (answear != handshake)
+            {
+                connected = false;
+                return ValidationStage::NotValidated;
+            }
+            else
+            {                
+                logger(LogLvl::Info) <<  "Client : " <<  logger::Brackets(packet.address->ID()) << ": Validated";
+                return ValidationStage::Validated;
+            }
         }
     }
 }

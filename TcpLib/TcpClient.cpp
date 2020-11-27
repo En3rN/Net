@@ -92,9 +92,9 @@ namespace En3rN
             return 0;
         }
         
-        int TcpClient::ProcessPackets(tsQueue<Packet>& incManager, tsQueue<Packet>& outManager, const std::shared_ptr<Connection>& connection)
+        int TcpClient::ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::shared_ptr<Connection>& connection)
         {
-            while (!incManager.Queue.empty())
+            while (!incManager.que.empty())
             {
                 Packet packet = std::move(incManager.PopBack());
                 std::string str;
@@ -107,25 +107,48 @@ namespace En3rN
                     packet >> str;
                     logger(LogLvl::Msg) << str;
                     break;
-                case PacketType::Command:
-                    //TODO implement commands for client
-                    logger(LogLvl::Warning) << "Invalid command! Deleting!";
+
+                case PacketType::HandShake:
+                {
+                    std::string key;
+                    packet >> key;
+                    std::string ekey = connection->Encrypt(key);
+                    Packet pResponse(connection, PacketType::HandShake);
+                    pResponse << ekey;
+                    outManager << pResponse;
+                    logger(LogLvl::Info) << "Sending handshake response!";
                     break;
-                case PacketType::ClientID:
-                    uint16_t id;
-                    packet >> id;
-                    packet.address->SetID(id);
-                    break;
+                }
+
+                /*case PacketType::ClientID:
+                    if (packet.header.itemcount > 1)
+                    {
+                        logger(LogLvl::Debug) << "ClientID arr";                        
+                    }
+                    else
+                    {
+                        uint16_t id;
+                        packet >> id;
+                        packet.address->SetID(id);                         
+                    }
+                    break; */
+
                 default:
                     logger(LogLvl::Warning) << "Unknown PacketType! deleting!";
-
                     break;
                 }                
             }
-            return true;
+            return 0;
+        }
+        bool TcpClient::Update()
+        {
+            if (!settings.networkThread) if (!NetworkFrame()) return false;
+            if (ProcessPackets(incManager, outManager, connection)) return false;
+            return m_running;
         }
         int TcpClient::SendData(Packet& packet)
         {
+            outManager << packet;
 
             return 0;
         }
@@ -159,11 +182,11 @@ namespace En3rN
                 connection->Disconnect("SocketError");                
             }
             
-            while (outManager.Queue.size() > 0)
+            while (!outManager.Empty())
             {
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
                 Packet packet = outManager.PopBack();                
-                if (packet.address->SendAll(packet) != 0)
+                if (connection->SendAll(packet) != 0)
                     incManager << packet; //putting packet back in que if failed to send
             }
             if (!settings.networkThread && !settings.loop) m_running = ProcessPackets(incManager, outManager, connection);   

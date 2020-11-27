@@ -18,10 +18,10 @@ namespace En3rN
 		class Connection : public std::enable_shared_from_this<Connection>
 		{	
 		public:	
-			enum class Type
-			{Listener,Connecter,Accepted};
+			enum class Type {Listener,Connecter,Accepted};
+			enum class ValidationStage {NotStarted,Started,NotValidated,Validated};
 
-			Connection(Type aType, Socket&& aSocket, IPEndpoint&& aEndpoint, tsQueue<Packet>& aOutManager, tsQueue<Packet>& aIncManager);
+			Connection(Type aType, Socket&& aSocket, IPEndpoint&& aEndpoint, tsQue<Packet>& aOutManager, tsQue<Packet>& aIncManager);
 			~Connection();
 			int SendAll(Packet& packet);
 			int RecvAll();
@@ -32,16 +32,15 @@ namespace En3rN
 			int Disconnect(const std::string& reason);
 			int Close();
 			bool IsConnected() const;
+			bool IsValidated() const;
 			uint16_t& ID();
 			std::string& UserName();
 			pollfd& PollFD();
 			Type GetType();
 			IPVersion GetIpVersion();
 			void SetID(uint16_t aid);
-
-		public:
-			
-			
+			std::string Encrypt(std::string& data);
+			ValidationStage Validate(Packet& packet);
 
 		private:
 			Type type;
@@ -51,11 +50,11 @@ namespace En3rN
 			uint16_t id;
 			User user;
 			pollfd pFd;
-			tsQueue<Packet>& outPacketQue;
-			tsQueue<Packet>& incPacketQue;
+			tsQue<Packet>& outPacketQue;
+			tsQue<Packet>& incPacketQue;
 			bool connected = false;
-
-
+			ValidationStage stage;
+			std::string handshake = "";
 		};
 	}
 }
