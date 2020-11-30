@@ -19,6 +19,7 @@ namespace En3rN
 			bool										m_running = false;
 			tsQue<Packet>								incManager{};
 			tsQue<Packet>								outManager{};
+			std::atomic_bool							ittConnections = false;
 
 			int			NetworkFrame();
 			int			Console();
@@ -32,7 +33,7 @@ namespace En3rN
 			virtual		~TcpServer();			
 			virtual int onClientConnect(std::shared_ptr<Connection> newClient);
 			virtual int onClientDisconnect(std::shared_ptr<Connection> client);
-			virtual int ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients);	
+			virtual int ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients);
 			bool		Update();
 			int			SendData(Packet& packet);
 			int			Init();

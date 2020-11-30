@@ -139,17 +139,17 @@ namespace En3rN
 			switch (ipversion)
 			{
 			case IPVersion::IPv4:
-				std::cout << "\tIP Version: IPv4" << std::endl;
+				std::cout << "IP Version: IPv4" << std::endl;
 				break;
 			case IPVersion::IPv6:
-				std::cout << "\tIP Version: IPv6" << std::endl;
+				std::cout << "IP Version: IPv6" << std::endl;
 				break;
 			default:
-				std::cout << "\tIP Version: Unknown" << std::endl;
+				std::cout << "IP Version: Unknown" << std::endl;
 			}
-			std::cout << "\tHostname: " << hostname << std::endl;
-			std::cout << "\tIP: " << ip << std::endl;
-			std::cout << "\tPort: " << port << std::endl;
+			std::cout << "Hostname: " << hostname << std::endl;
+			std::cout << "IP: " << ip << std::endl;
+			std::cout << "Port: " << port << std::endl;
 		}
 		void IPEndpoint::SetHostname()
 		{

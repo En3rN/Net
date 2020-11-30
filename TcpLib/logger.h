@@ -55,15 +55,7 @@
             }
             m_opened = false;
         }
-        template <typename t>
-        static std::string Brackets(t msg)
-        {
-            
-            std::stringstream ss;
-            ss << '[' << msg << ']';
-            //std::string str = ss.str();
-            return std::move(ss.str());
-        }
+        
         template<typename t>
         logger& operator<<(const t& msg)
         {

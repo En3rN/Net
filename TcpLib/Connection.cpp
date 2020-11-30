@@ -30,20 +30,20 @@ namespace En3rN
             while (bytesSendt < packetSize)
             {
                 bytes = send(socket.handle, &packet.body[bytesSendt], remainingSize, 0);
-                if (bytes == 0) { logger(LogLvl::Error) << "Sendt 0 bytes unexpected"; return -1; }
-                if (bytes == SOCKET_ERROR) { logger(LogLvl::Error) << "Socket error: " << WSAGetLastError(); return -1; }
-                if (bytes == WSAEWOULDBLOCK) { logger(LogLvl::Error) << "Socket Block: " << WSAGetLastError(); return -1; }
+                if (bytes == 0) { logger(LogLvl::Error) << Helpers::Brackets(id) << " Sendt 0 bytes unexpected"; return -1; }
+                if (bytes == SOCKET_ERROR) { logger(LogLvl::Error) << Helpers::Brackets(id) << " Socket error: " << WSAGetLastError(); return -1; }
+                if (bytes == WSAEWOULDBLOCK) { logger(LogLvl::Error) << Helpers::Brackets(id) << " Socket Block: " << WSAGetLastError(); incPacketQue << packet; return -1; }
                 bytesSendt += bytes;
                 remainingSize -= bytes;
             }
             if (bytesSendt == packetSize)
             {
-                logger(LogLvl::Info) << "Packet Succsesfully sendt! [" << bytesSendt << "/" << packetSize << "]";
+                logger(LogLvl::Debug) << "Packet Succsesfully sendt! [" << bytesSendt << "/" << packetSize << "]";
                 return  0;
             }
             else
             {
-                logger(LogLvl::Warning) << "Wrong number of bytes sendt! [" << bytesSendt << "/" << packetSize << "]";
+                logger(LogLvl::Warning) << Helpers::Brackets(id) << " Wrong number of bytes sendt! [" << bytesSendt << "/" << packetSize << "]";
                 return 0;
             }
         }
@@ -58,24 +58,24 @@ namespace En3rN
                 bytes = recv(socket.handle, &packet.body[bytesReceived], sizeof(packet.header), 0);
                 if (bytes == 0)
                 {
-                    Disconnect("Recv 0");                    
+                    Disconnect(Helpers::Brackets(id) +" Recv 0");
                     return 0;
                 }
                 if (bytes == SOCKET_ERROR)
                 {
-                    logger(LogLvl::Error) << "Socket ERROR: " << WSAGetLastError();
+                    logger(LogLvl::Error) << Helpers::Brackets(id) << " Socket ERROR: " << WSAGetLastError();
                     return WSAGetLastError();
                 }
                 if (bytes == WSAEWOULDBLOCK)
                 {                    
-                    logger(LogLvl::Error) << "Socket Block: " << WSAGetLastError();
+                    logger(LogLvl::Error) << Helpers::Brackets(id) << " Socket Block: " << WSAGetLastError();
                     return WSAGetLastError();
                 }
                 bytesReceived += bytes;
             }            
             if (packet.Size() > SO_MAX_MSG_SIZE || packet.Size() < 6)
             {
-                logger(LogLvl::Error) << "Packet header mismath. Size: [" << packet.Size() << "/" << SO_MAX_MSG_SIZE << "]";
+                logger(LogLvl::Error) << Helpers::Brackets(id) << " Packet header mismath. Size: [" << packet.Size() << "/" << SO_MAX_MSG_SIZE << "]";
                 packet.body.resize(SO_MAX_MSG_SIZE);
                 remainingSize = SO_MAX_MSG_SIZE - bytesReceived;
             }
@@ -93,26 +93,24 @@ namespace En3rN
                 
                 if (bytes == SOCKET_ERROR)
                 {
-                    logger(LogLvl::Error) << "Socket ERROR: " << WSAGetLastError();
+                    logger(LogLvl::Error) << Helpers::Brackets(id) << " Socket ERROR: " << WSAGetLastError();
                     return WSAGetLastError();
                 }
                 if (bytes == WSAEWOULDBLOCK)
                 {
-                    logger(LogLvl::Error) << "Socket Block: " << WSAGetLastError();
+                    logger(LogLvl::Error) << Helpers::Brackets(id) << " Socket Block: " << WSAGetLastError();
                     return WSAGetLastError();
                 }
-                if (bytes == 0)
-                {
-                    break;
-                }
+                if (bytes == 0) break;
                 bytesReceived += bytes;
                 
             }
-            if (bytesReceived < 6) return 0;
+            if (bytesReceived < 6) return 0; else packet.ReadHeader();
+            
             if (stage > ValidationStage::NotStarted && stage<ValidationStage::Validated) Validate(packet);
             if (bytesReceived != packet.Size())
             {
-                logger(LogLvl::Error) << "Packet header mismath. Received: [" << bytesReceived << "/" << packet.Size() << "]";
+                logger(LogLvl::Error) << Helpers::Brackets(id)<< " Packet header mismath. Received: [" << bytesReceived << "/" << packet.Size() << "]";
                 std::fstream fs;
                 while (!fs.is_open())
                 {
@@ -137,7 +135,7 @@ namespace En3rN
             }
             else
             {
-                logger(LogLvl::Info) << "Packet Succsesfully Received! [" << bytesReceived << "/" << packet.Size() << "]";
+                logger(LogLvl::Debug) << "Packet Succsesfully Received! [" << bytesReceived << "/" << packet.Size() << "]";
                 incPacketQue << std::move(packet);
                 return bytes;
             }
@@ -227,7 +225,7 @@ namespace En3rN
             newClient->stage = ValidationStage::Started;
             Packet phandshake(newClient, PacketType::HandShake);
             phandshake << key;
-            outPacketQue << phandshake;            
+            outPacketQue << std::move(phandshake);            
             
             /*Packet IdPacket(newClient, PacketType::ClientID);
             IdPacket << newClient->id;
@@ -353,7 +351,7 @@ namespace En3rN
             }
             else
             {                
-                logger(LogLvl::Info) <<  "Client : " <<  logger::Brackets(packet.address->ID()) << ": Validated";
+                logger(LogLvl::Info) <<  "Client : " <<  Helpers::Brackets(packet.address->ID()) << ": Validated";
                 return ValidationStage::Validated;
             }
         }

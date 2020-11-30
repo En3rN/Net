@@ -43,6 +43,7 @@ namespace En3rN
 			address = other.address;
 			header = other.header;
 			body = std::move(other.body);
+			
 			other.address = nullptr;
 			ZeroMemory(&other.header, sizeof(other,header));
 			other.body.clear();
@@ -121,6 +122,7 @@ namespace En3rN
 			body = other.body;
 			return *this;
 		}
+		
 		Packet& Packet::operator>>(std::string& data)
 		{
 			uint16_t offset = sizeof(header.type)+ sizeof(header.packetSize)+ sizeof(header.itemcount);

@@ -94,14 +94,14 @@ namespace En3rN
         
         int TcpClient::ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::shared_ptr<Connection>& connection)
         {
-            while (!incManager.que.empty())
+            while (!incManager.Empty())
             {
                 Packet packet = std::move(incManager.PopBack());
                 std::string str;
                 int i;
                 //todo find out what server needs to do with msg
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
-                switch (packet.GetPacketType())
+                switch (packet.header.type)
                 {
                 case PacketType::Message:
                     packet >> str;
@@ -115,12 +115,12 @@ namespace En3rN
                     std::string ekey = connection->Encrypt(key);
                     Packet pResponse(connection, PacketType::HandShake);
                     pResponse << ekey;
-                    outManager << pResponse;
+                    outManager << std::move(pResponse);
                     logger(LogLvl::Info) << "Sending handshake response!";
-                    break;
+                    break;  
                 }
 
-                /*case PacketType::ClientID:
+                case PacketType::ClientID:
                     if (packet.header.itemcount > 1)
                     {
                         logger(LogLvl::Debug) << "ClientID arr";                        
@@ -131,7 +131,7 @@ namespace En3rN
                         packet >> id;
                         packet.address->SetID(id);                         
                     }
-                    break; */
+                    break; 
 
                 default:
                     logger(LogLvl::Warning) << "Unknown PacketType! deleting!";
@@ -148,7 +148,7 @@ namespace En3rN
         }
         int TcpClient::SendData(Packet& packet)
         {
-            outManager << packet;
+            outManager << std::move(packet);
 
             return 0;
         }
@@ -187,9 +187,10 @@ namespace En3rN
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
                 Packet packet = outManager.PopBack();                
                 if (connection->SendAll(packet) != 0)
-                    incManager << packet; //putting packet back in que if failed to send
+                {
+                    //TODO : decide if we want to try again
+                }
             }
-            if (!settings.networkThread && !settings.loop) m_running = ProcessPackets(incManager, outManager, connection);   
             m_running= connection->IsConnected();
             return 0;
         }

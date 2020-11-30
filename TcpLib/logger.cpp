@@ -1,4 +1,4 @@
 #include "logger.h"
 // Setting default settings
-	LogLvl logger::LogLevel  = LogLvl::Info;
+	LogLvl logger::LogLevel  = LogLvl::Debug;
 	bool logger::LogHeader = true;

@@ -1,11 +1,13 @@
 #pragma once
 #include <vector>
 #include <iostream>
+#include <sstream>
 #include <direct.h>
 #include <algorithm>
 #include <locale>
 #include <cctype>
 #include <string>
+#include <stdint.h>
 
 
 
@@ -43,6 +45,14 @@ namespace En3rN
             std::string trim_copy(std::string s);
 
             std::string GenerateKey();
+            
+            template <typename t>
+            std::string Brackets(t data)
+            {
+                std::stringstream ss;
+                ss << '[' << data << ']';                
+                return std::move(ss.str());
+            }
             
         }
     }

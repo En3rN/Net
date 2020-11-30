@@ -29,7 +29,7 @@ public:
 int main() 
 {
 	using namespace En3rN::Net;
-	MyClient client("localhost", 50000, true, true, false, 5);
+	MyClient client("localhost", 50000, false, true, false, 5);
 	if (client.Init() == 0) client.Start();
 	while (client.Update())
 	{

@@ -12,6 +12,7 @@ namespace En3rN
 		template <typename T>
 		class tsQue
 		{
+			T ptr;
 		public:
 			tsQue() = default;
 			tsQue(tsQue& other) = delete;
@@ -20,6 +21,12 @@ namespace En3rN
 
 			std::mutex muxQue;
 			std::deque<T> que;
+
+			tsQue& operator[] (int index)
+			{
+				ptr = que[index];
+				return *ptr;
+			}
 
 
 			tsQue& operator << (T& item)
@@ -92,7 +99,6 @@ namespace En3rN
 			{
 				return que.empty();
 			}
-
 		};
 	}
 }
