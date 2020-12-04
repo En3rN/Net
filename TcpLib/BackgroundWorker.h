@@ -1,10 +1,20 @@
 #pragma once
 #include <thread>
+#include <functional>
 
 class BackgroundWorker
 {
-	std::thread Worker;
+	std::thread worker;
 public:
-	//int DoWork(Task task);
+	BackgroundWorker() = default;
+	~BackgroundWorker()
+	{
+		if (!worker.joinable()) worker.detach(); else worker.join();
+	}
+	template <typename T>
+	int DoWork(std::function<T> task)
+	{
+		task();
+	}
 };
 

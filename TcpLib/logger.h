@@ -3,35 +3,38 @@
 #include <sstream>
 #include "User.h"
 #include "consolecolor.h"
+#include <mutex>
 
 
     enum class LogLvl { Debug, Info, Warning, Error, Msg };
 
     class logger
     {
-        LogLvl          msgLevel = LogLvl::Info;
-        bool            m_opened = false;        
+        LogLvl          msgLevel = LogLvl::Info;        
+        bool            m_opened = false;
+        static std::mutex      mtxLog;
+
 
     public:
         class ScopedSettings 
         {
             friend logger;
-            LogLvl  oldLvl;
-            bool    oldHeader;
-            static bool scopedSettings;
+            LogLvl  scopedLvl = LogLvl::Error;
+            bool    scopedHeader = LogHeader;
+            static bool scopedSettings;            
 
         public:
             ScopedSettings(LogLvl loglvl, bool header)
             {
-                oldLvl = LogLevel;
-                oldHeader = LogHeader;                
-                Settings(loglvl, header);
+                scopedLvl = loglvl;
+                scopedHeader = LogHeader;                
+                //Settings(loglvl, header);
                 logger(LogLvl::Info) << "Setting loggersettings: "  << (int)(loglvl) << '/' << header;
             } 
             ~ScopedSettings()
             {
-                logger(LogLvl::Info) << "ReSetting loggersettings: " << (int)oldLvl << '/' << oldHeader;
-                Settings(oldLvl, oldHeader);
+                //logger(LogLvl::Info) << "ReSetting loggersettings: " << (int)oldLvl << '/' << oldHeader;
+                //Settings(oldLvl, oldHeader);
             }
         };
         static LogLvl   LogLevel;
@@ -44,6 +47,7 @@
 
         logger(LogLvl type)
         {
+            mtxLog.lock();
             msgLevel = type;
             if (LogHeader && msgLevel >= LogLevel) PrintLabel(type);
         }
@@ -54,6 +58,7 @@
                 std::cout << std::endl;
             }
             m_opened = false;
+            mtxLog.unlock();
         }
         
         template<typename t>

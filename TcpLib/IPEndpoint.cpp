@@ -12,8 +12,8 @@ namespace En3rN
 		{
 			char host[NI_MAXHOST];
 			ZeroMemory(host, NI_MAXHOST);
-			char ipstringbuffer[46];
-			DWORD ipbufferlength = 46;
+			//char ipstringbuffer[46];
+			//DWORD ipbufferlength = 46;
 			int i = 1;
 			in_addr addrv4;
 			in6_addr addrv6;			

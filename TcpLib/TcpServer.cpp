@@ -8,7 +8,7 @@
 #include "helpers.h"
 #include "logger.h"
 #include "User.h"
-#include "tsQueue.h"
+#include "tsQue.h"
 #include <assert.h>
 #include "Packet.h"
 #include <mutex>
@@ -19,7 +19,7 @@ namespace En3rN
     {
         TcpServer::TcpServer()
         {
-            settings.ip = "::";                 // will accept from all ipv4
+            settings.ip = "::";                 // will accept from all ipv6
             settings.port = 50000;              // port to listen
             settings.consoleThread = true;      // console cin on a own thread
             settings.networkThread = true;      // networkthread looping in background -- accepting/ recving / sending
@@ -41,7 +41,7 @@ namespace En3rN
         bool TcpServer::Update()
         {            
             if (!settings.networkThread) if(!NetworkFrame()) return false;
-            if(ProcessPackets(incManager, outManager, connections)) return false;
+            if(ProcessPackets()) return false;
             return m_running;
         }
 
@@ -71,7 +71,7 @@ namespace En3rN
             return 0;
         }
 
-        int TcpServer::ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients)
+        int TcpServer::ProcessPackets()
         {
             while (!incManager.Empty())
             {
@@ -102,8 +102,8 @@ namespace En3rN
                     {//TODO find correct connection to send to
                         bool foundClient = false;
 
-                        ittConnections = true;
-                        for (auto client : clients)
+                        connections.mtx.lock();
+                        for (auto client : connections)
                         {
                             if (client->GetType() == Connection::Type::Listener) continue;
                             if (vStr[1] == client->UserName() || vStr[1] == std::to_string(client->ID()))
@@ -118,7 +118,8 @@ namespace En3rN
                                 break;
                             }
                         }
-                        ittConnections = false;
+                        connections.mtx.unlock();
+                        /*ittConnections = false;*/
                         if (!foundClient) logger(LogLvl::Warning) << "Could not find receiver!";
                         break;
                     }
@@ -128,11 +129,15 @@ namespace En3rN
                     //packet.address->Validate(packet);
                     break;
                 default:
-                    //ProcessPacket(Packet & packet);
+                    if(onMessage(packet)!=0) return 1;
                     break;
                 }
             }
         return 0;
+        }
+        int TcpServer::onMessage(Packet& Packet)
+        {
+            return 0;
         }
 
         int TcpServer::SendData(Packet& packet)
@@ -162,7 +167,7 @@ namespace En3rN
 
             if (settings.loop && m_running)
             {
-                while (ProcessPackets(incManager, outManager, connections)==0 && m_running) {}
+                while (ProcessPackets()==0 && m_running) {}
                 m_running = false;                
             }
             
@@ -206,7 +211,7 @@ namespace En3rN
                             if (onClientConnect(newConnection)==0)
                             {
                                 pollFDS.emplace_back(newConnection->PollFD());
-                                connections.push_back(newConnection);
+                                connections.PushBack(newConnection);
                                 Packet clientIds(nullptr, PacketType::ClientID);
                                 for (int i = 1; i < connections.size(); i++)
                                 {
@@ -280,10 +285,11 @@ namespace En3rN
         }
         int TcpServer::CloseConnection(int& index, const std::string& reason)
         {
-            while (ittConnections) 
+            /*while (ittConnections) 
             {
                 logger(LogLvl::Warning) << "Waiting for itt!!";
-            };
+            };*/
+            std::scoped_lock lock(connections.mtx);
             connections[index]->Disconnect(reason);
             onClientDisconnect(connections[index]);
             connections.erase(connections.begin() + index);
@@ -293,7 +299,7 @@ namespace En3rN
         }
         int TcpServer::SendToAll(Packet& packet, std::shared_ptr<Connection> ignoreClient)
         {
-            ittConnections = true;
+            std::scoped_lock lock(connections.mtx);
             for (auto client : connections)
             {
                 if (client->GetType() != Connection::Type::Listener && client!=ignoreClient)
@@ -302,8 +308,6 @@ namespace En3rN
                     outManager << packet;
                 }
             }
-            ittConnections = false;
-
             return 0;
         }
         int TcpServer::GetConnection(uint16_t aID)

@@ -2,21 +2,17 @@
 #include "helpers.h"
 #include "TcpServer.h"
 #include "Packet.h"
-#include "tsQueue.h"
+#include "tsQue.h"
 #include "Connection.h"
 #include <thread>
+#include "tsVec.h"
 
 using namespace En3rN::Net;
 
-enum class PacketType
+class MyServer : public TcpServer
 {
-	Message, jaja
-};
+public:	
 
-
-class MyServer : public En3rN::Net::TcpServer
-{
-public:
 	MyServer() {};
 	MyServer(const char* aIp, int aPort, bool aConsoleth, bool aNetworkth, bool aLoop, int aTimeout)
 	{
@@ -37,9 +33,15 @@ public:
 	{
 		return 0;
 	}
-	virtual int ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::vector<std::shared_ptr<Connection>>& clients) override
+	virtual int onMessage(Packet& packet) override
 	{
-		TcpServer::ProcessPackets(incManager,outManager,clients);
+		switch (packet.header.type)
+		{
+			// add packet types in packettype.h
+		default:
+			logger(LogLvl::Warning) << "Unknown packet type!";
+			break;
+		}
 		return 0;
 	}
 
@@ -47,7 +49,8 @@ public:
 
 int main()
 {
-	MyServer server("0.0.0.0", 50000, true, true, true, 5);
+	MyServer server("0.0.0.0", 50000, true, true, true, 5);	
+
 	if (server.Init() == 0) server.Start();
 	while (server.Update()) 
 	{

@@ -50,7 +50,8 @@ namespace En3rN
 		}
 		Packet::~Packet()
 		{			
-			if (body.size() != 0) logger(LogLvl::Debug) << "Packet deleted!";
+			if (body.size() != 0) 
+				logger(LogLvl::Debug) << "Packet deleted!";
 			Clear();
 
 		}
@@ -94,7 +95,7 @@ namespace En3rN
 
 		void Packet::WriteHeader()
 		{
-			assert(body.size() > sizeof(header.type) + sizeof(header.packetSize) + sizeof(header.itemcount));
+			assert(body.size() >= sizeof(header.type) + sizeof(header.packetSize) + sizeof(header.itemcount));
 			memcpy(body.data(),													&header.type,			sizeof(header.type));
 			memcpy(body.data()+ sizeof(header.type),							&header.packetSize,		sizeof(header.packetSize));
 			memcpy(body.data()+ sizeof(header.type)+ sizeof(header.packetSize), &header.itemcount,		sizeof(header.itemcount));			
@@ -102,7 +103,7 @@ namespace En3rN
 
 		void Packet::ReadHeader()
 		{
-			assert(body.size() > sizeof(header.type) + sizeof(header.packetSize) + sizeof(header.itemcount));
+			assert(body.size() >= sizeof(header.type) + sizeof(header.packetSize) + sizeof(header.itemcount));
 			memcpy(&header.type,		body.data(),													sizeof(header.type));
 			memcpy(&header.packetSize,	body.data() + sizeof(header.type),								sizeof(header.packetSize));
 			memcpy(&header.itemcount,	body.data() + sizeof(header.type) + sizeof(header.packetSize),  sizeof(header.itemcount));
@@ -156,11 +157,11 @@ namespace En3rN
 		{
 			ItemHeader ih;
 			ih.type = SetType(data);
-			ih.size = data.size();
+			ih.size = (uint16_t)data.size();
 
 			Append(&ih.type, sizeof(ih.type));
 			Append(&ih.size, sizeof(ih.size));
-			Append(data.data(), data.size());
+			Append(data.data(), (uint16_t)data.size());
 			
 			header.itemcount++;
 			WriteHeader();

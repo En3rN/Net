@@ -188,6 +188,7 @@
     <ClInclude Include="BackgroundWorker.h" />
     <ClInclude Include="Connection.h" />
     <ClInclude Include="consolecolor.h" />
+    <ClInclude Include="Header.h" />
     <ClInclude Include="packettype.h" />
     <ClInclude Include="helpers.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
@@ -201,8 +202,9 @@
     <ClInclude Include="Packet.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="TcpClient.h" />
-    <ClInclude Include="tsQueue.h" />
+    <ClInclude Include="tsQue.h" />
     <ClInclude Include="TcpServer.h" />
+    <ClInclude Include="tsVec.h" />
     <ClInclude Include="User.h" />
   </ItemGroup>
   <ItemGroup>

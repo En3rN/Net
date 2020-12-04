@@ -7,7 +7,7 @@ namespace En3rN
 	{
 		enum class PacketType :uint16_t
 		{
-			Message,
+			Message,						// user packet types
 			ClientID = 65000, HandShake		// internal packet types
 		};
 	}
