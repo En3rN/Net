@@ -29,14 +29,14 @@ public:
 int main() 
 {
 	using namespace En3rN::Net;
-	MyClient client("localhost", 50000, false, true, false, 5);
+	MyClient client("localhost", 50000, true, true, false, 5);
 	if (client.Init() == 0) client.Start();
 	while (client.Update())
 	{
 		std::string s = "all " + Helpers::GenerateKey();
 		Packet p;
 		p << s;
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+		std::this_thread::sleep_for(std::chrono::seconds(1));		
 		client.SendData(p);
 
 	};	//if main tread not looping

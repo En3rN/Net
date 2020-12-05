@@ -91,7 +91,10 @@ namespace En3rN
 
                     if (vStr[0]=="all")
                     {
-                        vStr[0] = Helpers::Brackets(packet.address->ID());
+                        if (packet.address != nullptr)
+                            vStr[0] = Helpers::Brackets(packet.address->ID());
+                        else
+                            vStr.erase(vStr.begin());
                         
                         response << Helpers::Join(vStr,' ');
 
@@ -106,11 +109,14 @@ namespace En3rN
                         for (auto client : connections)
                         {
                             if (client->GetType() == Connection::Type::Listener) continue;
-                            if (vStr[1] == client->UserName() || vStr[1] == std::to_string(client->ID()))
+                            if (vStr[0] == client->UserName() || vStr[0] == std::to_string(client->ID()))
                             {
-                                vStr.erase(vStr.begin() + 1);
+                                if (packet.address != nullptr)
+                                    vStr[0] = Helpers::Brackets(packet.address->ID());
+                                else
+                                    vStr.erase(vStr.begin());
                                 str = Helpers::Join(vStr, ' ');
-                                logger(LogLvl::Info) << packet.address->UserName() << " " << str;
+                                //logger(LogLvl::Info) << packet.address->UserName() << " " << str;
                                 response << str;
                                 response.address = client->shared_from_this();
                                 outManager << std::move(response);
@@ -221,14 +227,16 @@ namespace En3rN
                             continue;
                         }
                         else
-                        {
+                        {                            
                             int r = connections[i]->RecvAll();
-                            if (r < 1) { CloseConnection(i, "Recv : " + std::to_string(r)); }          continue;
+                            if(r==-10)  { CloseConnection(i, "Failed Validation"); } continue;
+                            if (r < 1)  { CloseConnection(i, "Recv : " + std::to_string(r)); } continue;
                         }
                     
                     if (pollFDS[i].revents & POLLERR)    { CloseConnection(i, "POLLERR");    continue; }
                     if (pollFDS[i].revents & POLLHUP)    { CloseConnection(i, "POLLHUP");    continue; }
                     if (pollFDS[i].revents & POLLNVAL)   { CloseConnection(i, "POLLINVAL");  continue; }
+                    
                    
                 logger(LogLvl::Warning) << "Unhandled Flag! Revents: "<< pollFDS[i].revents <<" On connectionID: " << connections[i]->ID();
                     
@@ -267,8 +275,9 @@ namespace En3rN
             {                
                 if ((PacketType)std::stoi(v[0]) == PacketType::Message)
                 {
-                    Packet packet;
-                    v[0] = "[Server]";
+                    Packet packet; 
+                    v.erase(v.begin());
+                    v.insert(v.begin() + 1,"[Server]");
                     std::string msg = Helpers::Join(v, ' ');                    
                     packet << msg;
                     std::string str;                    

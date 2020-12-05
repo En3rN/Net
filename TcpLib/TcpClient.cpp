@@ -55,8 +55,9 @@ namespace En3rN
                 {
                     
                     Packet packet(connection->shared_from_this());
-                    packet.header.type = (PacketType)stoi(v[0]);                    
-                    v[0] = "[" + std::to_string(connection->ID())+"]";
+                    packet.header.type = (PacketType)stoi(v[0]);
+                    v.erase(v.begin());
+                    //v[0] = "[" + std::to_string(connection->ID())+"]";
                     strBuf= Helpers::Join(v, ' ');
                     packet << strBuf;
                     outManager << packet;
@@ -117,6 +118,7 @@ namespace En3rN
                     pResponse << ekey;
                     outManager << std::move(pResponse);
                     logger(LogLvl::Info) << "Sending handshake response!";
+                    
                     break;  
                 }
 
@@ -142,12 +144,15 @@ namespace En3rN
         }
         bool TcpClient::Update()
         {
-            if (!settings.networkThread) if (!NetworkFrame()) return false;
-            if (ProcessPackets(incManager, outManager, connection)) return false;
+            while (!connection->IsValidated() && m_running)
+            {
+                if (!settings.networkThread) if (NetworkFrame()) return false;
+                if (ProcessPackets(incManager, outManager, connection)) return false;
+            }
             return m_running;
         }
         int TcpClient::SendData(Packet& packet)
-        {
+        {            
             outManager << std::move(packet);
 
             return 0;
@@ -226,7 +231,7 @@ namespace En3rN
 
             if (settings.loop && m_running)
             {
-                while (ProcessPackets(incManager, outManager, connection) && m_running) {}                
+                while (!ProcessPackets(incManager, outManager, connection) && m_running) {}                
                 m_running = false;
             }
             return 0;

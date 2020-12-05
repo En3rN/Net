@@ -12,7 +12,7 @@ namespace En3rN
 
 		void PushBack(const T& data)
 		{
-			std::scoped_lock(mtx);
+			std::scoped_lock lock(mtx);
 			this->push_back(data);			
 		}
 	};

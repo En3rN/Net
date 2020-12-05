@@ -50,15 +50,15 @@ namespace En3rN
 
         int En3rN::Net::Connection::RecvAll()
         {
-            Packet packet(this->shared_from_this());            
-            uint16_t bytesReceived = 0, bytes = 0, remainingSize=0;
+            Packet packet(this->shared_from_this());
+            uint16_t bytesReceived = 0, bytes = 0, remainingSize = 0;
 
             while (bytesReceived < sizeof(uint16_t))
             {
                 bytes = recv(socket.handle, &packet.body[bytesReceived], sizeof(packet.header), 0);
                 if (bytes == 0)
                 {
-                    Disconnect(Helpers::Brackets(id) +" Recv 0");
+                    Disconnect(Helpers::Brackets(id) + " Recv 0");
                     return 0;
                 }
                 if (bytes == SOCKET_ERROR)
@@ -67,12 +67,12 @@ namespace En3rN
                     return WSAGetLastError();
                 }
                 if (bytes == WSAEWOULDBLOCK)
-                {                    
+                {
                     logger(LogLvl::Error) << Helpers::Brackets(id) << " Socket Block: " << WSAGetLastError();
                     return WSAGetLastError();
                 }
                 bytesReceived += bytes;
-            }            
+            }
             if (packet.Size() > SO_MAX_MSG_SIZE || packet.Size() < 6)
             {
                 logger(LogLvl::Error) << Helpers::Brackets(id) << " Packet header mismath. Size: [" << packet.Size() << "/" << SO_MAX_MSG_SIZE << "]";
@@ -80,17 +80,17 @@ namespace En3rN
                 remainingSize = SO_MAX_MSG_SIZE - bytesReceived;
             }
             else
-            {               
+            {
                 packet.body.resize(packet.Size());
                 remainingSize = packet.Size();
             }
-            
+
 
             while (bytesReceived < packet.Size())
             {
                 remainingSize -= bytesReceived;
-                bytes = recv(socket.handle, &packet.body[bytesReceived],remainingSize, 0);
-                
+                bytes = recv(socket.handle, &packet.body[bytesReceived], remainingSize, 0);
+
                 if (bytes == SOCKET_ERROR)
                 {
                     logger(LogLvl::Error) << Helpers::Brackets(id) << " Socket ERROR: " << WSAGetLastError();
@@ -103,11 +103,15 @@ namespace En3rN
                 }
                 if (bytes == 0) break;
                 bytesReceived += bytes;
-                
+
             }
             if (bytesReceived < 6) return 0; else packet.ReadHeader();
-            
-            if (stage > ValidationStage::NotStarted && stage<ValidationStage::Validated) Validate(packet);
+
+            if (stage > ValidationStage::NotStarted && stage < ValidationStage::Validated)
+            {
+                stage = Validate(packet);
+                if (stage == ValidationStage::NotValidated) return -10; else return bytesReceived;
+            }
             if (bytesReceived != packet.Size())
             {
                 logger(LogLvl::Error) << Helpers::Brackets(id)<< " Packet header mismath. Received: [" << bytesReceived << "/" << packet.Size() << "]";
