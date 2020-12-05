@@ -142,7 +142,7 @@ namespace En3rN
         }
         bool TcpClient::Update()
         {
-            if (!settings.networkThread) if (!NetworkFrame()) return false;
+            if (!settings.networkThread) if (NetworkFrame()) return false;
             if (ProcessPackets(incManager, outManager, connection)) return false;
             return m_running;
         }
@@ -226,7 +226,7 @@ namespace En3rN
 
             if (settings.loop && m_running)
             {
-                while (ProcessPackets(incManager, outManager, connection) && m_running) {}                
+                while (!ProcessPackets(incManager, outManager, connection) && m_running) {}                
                 m_running = false;
             }
             return 0;

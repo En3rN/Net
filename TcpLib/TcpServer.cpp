@@ -221,14 +221,16 @@ namespace En3rN
                             continue;
                         }
                         else
-                        {
+                        {                            
                             int r = connections[i]->RecvAll();
-                            if (r < 1) { CloseConnection(i, "Recv : " + std::to_string(r)); }          continue;
+                            if(r==-10)  { CloseConnection(i, "Failed Validation"); } continue;
+                            if (r < 1)  { CloseConnection(i, "Recv : " + std::to_string(r)); } continue;
                         }
                     
                     if (pollFDS[i].revents & POLLERR)    { CloseConnection(i, "POLLERR");    continue; }
                     if (pollFDS[i].revents & POLLHUP)    { CloseConnection(i, "POLLHUP");    continue; }
                     if (pollFDS[i].revents & POLLNVAL)   { CloseConnection(i, "POLLINVAL");  continue; }
+                    
                    
                 logger(LogLvl::Warning) << "Unhandled Flag! Revents: "<< pollFDS[i].revents <<" On connectionID: " << connections[i]->ID();
                     

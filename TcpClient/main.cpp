@@ -29,7 +29,7 @@ public:
 int main() 
 {
 	using namespace En3rN::Net;
-	MyClient client("localhost", 50000, false, true, false, 5);
+	MyClient client("localhost", 50000, true, true, true, 5);
 	if (client.Init() == 0) client.Start();
 	while (client.Update())
 	{
@@ -40,6 +40,6 @@ int main()
 		client.SendData(p);
 
 	};	//if main tread not looping
-	//std::cin.get();
+	std::cin.get();
 	return 0;
 }
