@@ -40,6 +40,6 @@ int main()
 		client.SendData(p);
 
 	};	//if main tread not looping
-	//std::cin.get();
+	std::cin.get();
 	return 0;
 }
