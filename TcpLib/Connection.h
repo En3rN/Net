@@ -42,7 +42,7 @@ namespace En3rN
 			std::string Encrypt(std::string& data);
 			ValidationStage Validate(Packet& packet);
 
-		private:
+		protected:
 			Type type;
 			static uint16_t idCounter;
 			Socket socket;

@@ -340,7 +340,13 @@ namespace En3rN
             return std::move(encrypted);
         }
         Connection::ValidationStage Connection::Validate(Packet& packet)
-        {           
+        {
+            if (type == Connection::Type::Connecter)
+            {
+                stage = ValidationStage::Validated;
+                return ValidationStage::Validated;
+            }
+                
             if (packet.GetPacketType() != PacketType::HandShake)
             {
                 connected = false;                

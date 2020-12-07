@@ -118,7 +118,7 @@ namespace En3rN
                     pResponse << ekey;
                     outManager << std::move(pResponse);
                     logger(LogLvl::Info) << "Sending handshake response!";
-                    
+                    connection->Validate(pResponse);                    
                     break;  
                 }
 
@@ -143,12 +143,10 @@ namespace En3rN
             return 0;
         }
         bool TcpClient::Update()
-        {
-            while (!connection->IsValidated() && m_running)
-            {
-                if (!settings.networkThread) if (NetworkFrame()) return false;
-                if (ProcessPackets(incManager, outManager, connection)) return false;
-            }
+        {            
+            if (!settings.networkThread) if (NetworkFrame()) return false;
+            if (ProcessPackets(incManager, outManager, connection)) return false;
+           
             return m_running;
         }
         int TcpClient::SendData(Packet& packet)
@@ -227,6 +225,11 @@ namespace En3rN
                     logger(LogLvl::Debug) << "ConsoleThread Finished: " << std::this_thread::get_id();
                     settings.consoleThread = false; });
                 consolethread.detach();
+            }
+            while (!connection->IsValidated() && m_running)
+            {
+                if (!settings.networkThread) if (NetworkFrame()) return 1;
+                if (ProcessPackets(incManager, outManager, connection)) return 1;
             }
 
             if (settings.loop && m_running)
