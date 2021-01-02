@@ -1,10 +1,6 @@
 #pragma once
-#define WIN32_LEAN_AND_MEAN
-#include <WinSock2.h>
-#include <WS2tcpip.h>
+#include "Network.h"
 #include <string>
-
-
 
 namespace En3rN
 {

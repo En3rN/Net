@@ -1,5 +1,5 @@
+
 #include "TcpClient.h"
-#include "Network.h"
 #include "logger.h"
 #include "helpers.h"
 using namespace En3rN::Net;
@@ -19,12 +19,22 @@ namespace En3rN
 
         TcpClient::~TcpClient() { Stop(); }
 
-        int TcpClient::OnClientConnect(const std::shared_ptr<Connection>& connection)
+        int TcpClient::onClientConnect(const std::shared_ptr<Connection> & connection)
         {
             return 0;
         }
 
-        int TcpClient::OnClientDisconnect(const std::shared_ptr<Connection>& connection)
+        int TcpClient::onClientDisconnect(const std::shared_ptr<Connection>& connection)
+        {
+            return 0;
+        }
+
+        int TcpClient::onUserPacket(Packet& Packet)
+        {
+            return 0;
+        }
+
+        int TcpClient::onUserUpdate()
         {
             return 0;
         }
@@ -52,10 +62,8 @@ namespace En3rN
             if (v.size() > 2)
             {
                 try
-                {
-                    
-                    Packet packet(connection->shared_from_this());
-                    packet.header.type = (PacketType)stoi(v[0]);
+                {                    
+                    Packet packet(ServerPacket::Message, connection);                    
                     v.erase(v.begin());
                     //v[0] = "[" + std::to_string(connection->ID())+"]";
                     strBuf= Helpers::Join(v, ' ');
@@ -93,7 +101,7 @@ namespace En3rN
             return 0;
         }
         
-        int TcpClient::ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::shared_ptr<Connection>& connection)
+        int TcpClient::ProcessPackets()
         {
             while (!incManager.Empty())
             {
@@ -102,28 +110,28 @@ namespace En3rN
                 int i;
                 //todo find out what server needs to do with msg
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
-                switch (packet.header.type)
+                switch (packet.GetPacketType<ServerPacket>())
                 {
-                case PacketType::Message:
+                case ServerPacket::Message:
                     packet >> str;
                     logger(LogLvl::Msg) << str;
                     break;
 
-                case PacketType::HandShake:
+                case ServerPacket::HandShake:
                 {
                     std::string key;
                     packet >> key;
                     std::string ekey = connection->Encrypt(key);
-                    Packet pResponse(connection, PacketType::HandShake);
+                    Packet pResponse(ServerPacket::HandShake, connection);
                     pResponse << ekey;
+                    connection->Validate(pResponse);
                     outManager << std::move(pResponse);
                     logger(LogLvl::Info) << "Sending handshake response!";
-                    connection->Validate(pResponse);                    
                     break;  
                 }
 
-                case PacketType::ClientID:
-                    if (packet.header.itemcount > 1)
+                case ServerPacket::ClientID:
+                    if (packet.Header().itemcount > 1)
                     {
                         logger(LogLvl::Debug) << "ClientID arr";                        
                     }
@@ -136,16 +144,17 @@ namespace En3rN
                     break; 
 
                 default:
-                    logger(LogLvl::Warning) << "Unknown PacketType! deleting!";
+                    if(onUserPacket(packet)) logger(LogLvl::Warning) << "Unknown Packet";
                     break;
                 }                
             }
             return 0;
         }
         bool TcpClient::Update()
-        {            
+        {
+            if (!m_running) return false;
             if (!settings.networkThread) if (NetworkFrame()) return false;
-            if (ProcessPackets(incManager, outManager, connection)) return false;
+            if (ProcessPackets()) return false;
            
             return m_running;
         }
@@ -194,12 +203,16 @@ namespace En3rN
                     //TODO : decide if we want to try again
                 }
             }
-            m_running= connection->IsConnected();
-            return 0;
+            m_running = connection->IsConnected();
+            return 0;            
         }
         int TcpClient::Stop()
         {
-            while (settings.networkThread) {};
+            while (settings.networkThread)
+            {
+                std::this_thread::yield();
+            }; // wait for networkThread to finish
+            // close connections
             // close sockets
             connection.reset();
             //cleanup winsock
@@ -229,12 +242,12 @@ namespace En3rN
             while (!connection->IsValidated() && m_running)
             {
                 if (!settings.networkThread) if (NetworkFrame()) return 1;
-                if (ProcessPackets(incManager, outManager, connection)) return 1;
+                if (ProcessPackets()) return 1;
             }
 
             if (settings.loop && m_running)
             {
-                while (!ProcessPackets(incManager, outManager, connection) && m_running) {}                
+                while (!ProcessPackets() && m_running) {}                
                 m_running = false;
             }
             return 0;

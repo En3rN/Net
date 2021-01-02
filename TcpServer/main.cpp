@@ -9,6 +9,8 @@
 
 using namespace En3rN::Net;
 
+enum class UserPacket {test};
+
 class MyServer : public TcpServer
 {
 public:	
@@ -24,20 +26,23 @@ public:
 		settings.timeout = aTimeout;        // timeout on wsapoll ms		
 	}
 
-	virtual int onClientConnect(std::shared_ptr<Connection> client) override
+	virtual int onClientConnect(std::shared_ptr<Connection>& client) override
 	{
 		TcpServer::onClientConnect(client); // sends out welcome msg;
 		return 0;
 	}
-	virtual int onClientDisconnect(std::shared_ptr<Connection> client) override
+	virtual int onClientDisconnect(std::shared_ptr<Connection> &client) override
 	{
 		return 0;
 	}
-	virtual int onMessage(Packet& packet) override
+	virtual int onUserPacket(Packet& packet) override
 	{
-		switch (packet.header.type)
+		switch (packet.GetPacketType<UserPacket>())
 		{
-			// add packet types in packettype.h
+		case UserPacket::test:
+			// TODO:: do something
+			break;
+			
 		default:
 			logger(LogLvl::Warning) << "Unknown packet type!";
 			break;
@@ -49,13 +54,13 @@ public:
 
 int main()
 {
-	MyServer server("0.0.0.0", 50000, true, true, true, 5);	
+	MyServer server("::", 55000, true, true, false, 5);	
 
 	if (server.Init() == 0) server.Start();
 	while (server.Update()) 
 	{
 		std::string s = "all " +Helpers::GenerateKey();
-		Packet p;
+		Packet p(ServerPacket::Message);
 		p << s;
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 		server.SendData(p);

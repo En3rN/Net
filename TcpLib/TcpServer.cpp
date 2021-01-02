@@ -12,6 +12,7 @@
 #include <assert.h>
 #include "Packet.h"
 #include <mutex>
+#include "BackgroundWorker.h"
 
 namespace En3rN
 {
@@ -29,7 +30,7 @@ namespace En3rN
         }
         TcpServer::~TcpServer() 
         {            
-            while (settings.networkThread || settings.consoleThread) 
+            while (settings.networkThread) 
             {
                 std::this_thread::yield();
             }; // wait for networkThread to finish
@@ -76,37 +77,37 @@ namespace En3rN
             while (!incManager.Empty())
             {
                 Packet packet = std::move(incManager.PopBack());
-                std::string str;
-                std::vector<std::string> vStr;
-                Packet response;
+                
 
                 logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
 
-                switch (packet.GetPacketType())
+                switch (packet.GetPacketType<ServerPacket>())
                 {
-                case PacketType::Message:
-
+                case ServerPacket::Message:
+                {
+                    std::string str;
+                    std::vector<std::string> vStr;
+                    Packet response(ServerPacket::Message);
                     packet >> str;
                     vStr = Helpers::Split(str, ' ');
 
-                    if (vStr[0]=="all")
-                    {
+                    if (vStr[0] == "all"){
                         if (packet.address != nullptr)
                             vStr[0] = Helpers::Brackets(packet.address->ID());
                         else
-                            vStr.erase(vStr.begin());
-                        
-                        response << Helpers::Join(vStr,' ');
+                            vStr[0] = Helpers::Brackets("Server");
+
+                        response << Helpers::Join(vStr, ' ');
 
                         SendToAll(response, packet.address);
                         break;
                     }
                     else
-                    {//TODO find correct connection to send to
+                    {
                         bool foundClient = false;
-
+                        //std::scoped_lock lock(connections.mtx);
                         connections.mtx.lock();
-                        for (auto client : connections)
+                        for (auto& client : connections)
                         {
                             if (client->GetType() == Connection::Type::Listener) continue;
                             if (vStr[0] == client->UserName() || vStr[0] == std::to_string(client->ID()))
@@ -116,32 +117,37 @@ namespace En3rN
                                 else
                                     vStr.erase(vStr.begin());
                                 str = Helpers::Join(vStr, ' ');
-                                //logger(LogLvl::Info) << packet.address->UserName() << " " << str;
                                 response << str;
-                                response.address = client->shared_from_this();
+                                response.address = client;
                                 outManager << std::move(response);
                                 foundClient = true;
                                 break;
                             }
                         }
-                        connections.mtx.unlock();
-                        /*ittConnections = false;*/
+                        connections.mtx.unlock();                        
                         if (!foundClient) logger(LogLvl::Warning) << "Could not find receiver!";
+                        logger(LogLvl::Info) << str;
                         break;
                     }
                     break;
+                }
 
-                case PacketType::HandShake:
+                case ServerPacket::HandShake:
                     //packet.address->Validate(packet);
                     break;
                 default:
-                    if(onMessage(packet)!=0) return 1;
+                    if(onUserPacket(packet)!=0) return 1;
                     break;
                 }
             }
         return 0;
         }
-        int TcpServer::onMessage(Packet& Packet)
+        int TcpServer::onUserPacket(Packet& Packet)
+        {
+            return 0;
+        }
+
+        int TcpServer::onUserUpdate()
         {
             return 0;
         }
@@ -171,15 +177,15 @@ namespace En3rN
                 consolethread.detach();
             }
 
-            if (settings.loop && m_running)
+            if (settings.loop && m_running )
             {
-                while (ProcessPackets()==0 && m_running) {}
+                while (ProcessPackets()==0 && m_running && !onUserUpdate()) {}
                 m_running = false;                
             }
             
             return 0;
         }
-        int TcpServer::onClientDisconnect(std::shared_ptr<Connection> client)
+        int TcpServer::onClientDisconnect(std::shared_ptr<Connection> & client)
         {
             return 0;
         }
@@ -188,9 +194,9 @@ namespace En3rN
             m_running = false;
             return 0;
         }
-        int TcpServer::onClientConnect(std::shared_ptr<Connection> newClient)
+        int TcpServer::onClientConnect(std::shared_ptr<Connection> & newClient)
         {
-            Packet packet(newClient);
+            Packet packet(ServerPacket::Message, newClient);
             std::string msg = "[Server]Welcome to En3rN Server";
             packet << msg;
             outManager << std::move(packet);
@@ -218,7 +224,7 @@ namespace En3rN
                             {
                                 pollFDS.emplace_back(newConnection->PollFD());
                                 connections.PushBack(newConnection);
-                                Packet clientIds(nullptr, PacketType::ClientID);
+                                Packet clientIds(ServerPacket::ClientID);
                                 for (int i = 1; i < connections.size(); i++)
                                 {
                                     clientIds << connections[i]->ID();
@@ -273,11 +279,11 @@ namespace En3rN
                 
             try
             {                
-                if ((PacketType)std::stoi(v[0]) == PacketType::Message)
+                if ((ServerPacket)std::stoi(v[0]) == ServerPacket::Message)
                 {
-                    Packet packet; 
+                    Packet packet(ServerPacket::Message);
                     v.erase(v.begin());
-                    v.insert(v.begin() + 1,"[Server]");
+                    //v.insert(v.begin() + 1,"[Server]");
                     std::string msg = Helpers::Join(v, ' ');                    
                     packet << msg;
                     std::string str;                    
@@ -293,11 +299,7 @@ namespace En3rN
             return 0;
         }
         int TcpServer::CloseConnection(int& index, const std::string& reason)
-        {
-            /*while (ittConnections) 
-            {
-                logger(LogLvl::Warning) << "Waiting for itt!!";
-            };*/
+        {            
             std::scoped_lock lock(connections.mtx);
             connections[index]->Disconnect(reason);
             onClientDisconnect(connections[index]);

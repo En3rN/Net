@@ -5,20 +5,21 @@
 #include "logger.h"
 #include <typeinfo>
 #include <iterator>
-#include "packettype.h"
+#include "serverpacket.h"
 
 
 namespace En3rN
 {
 	namespace Net
 	{	
-		class Connection;
 		
 		struct Header
-		{
-			PacketType type{};
+		{			
+			uint16_t type{};		
 			uint16_t packetSize=sizeof(Header);
 			uint16_t itemcount=0;
+			template <typename t>
+			t& PacketType() { return (t&)type; }
 		};
 
 		struct ItemHeader
@@ -39,39 +40,59 @@ namespace En3rN
 		2 byte item type, 2 byte itemsize, item(itemsize)
 		}body
 
-		*/
-		
-		
+		*/	
+		class Connection;
 		class Packet
 		{			
-		public:
-			//template <typename t>
-			//std::iterator<Item<t>> itt;
-			std::shared_ptr<Connection> address;
-			Header header;
+		public:			
+
+			static const uint16_t HeaderSize = 6;
+			std::shared_ptr<Connection> address;			
 			std::vector<char> body;
 			
 
 			Packet();			
-			Packet(std::shared_ptr<Connection> aOwner, PacketType aType=PacketType::Message);
+			Packet(std::shared_ptr<Connection> aOwner);
+			template <typename T, class = typename std::enable_if<std::is_enum<T>::value>::type >
+			Packet(T packetType , std::shared_ptr<Connection> con = nullptr)
+			{
+				body.resize(HeaderSize);
+				Net::Header header;
+				address = con;
+				header.type = (uint16_t)packetType;
+				header.packetSize = (HeaderSize);
+				header.itemcount = 0;
+				memcpy(&body[0], &header, HeaderSize);
+			}
 			Packet(const Packet& other);
 			Packet(Packet&& other) noexcept;
 			~Packet();
 			void Clear();
 			void Append(const void* data, uint16_t size);
-			void WriteHeader();
-			void ReadHeader();
-			PacketType GetPacketType();
+			/*void WriteHeader();
+			void ReadHeader();*/
+			Header Header();
+			
 			uint16_t Size();
-			uint16_t ItemCount();
+			uint16_t Count();
 			uint16_t GetItemSize(uint16_t offset);
-			size_t GetType(uint16_t offset);
+			size_t GetItemType(uint16_t offset);
 			template <typename T>
-			size_t SetType(T& data)
+			size_t SetItemType(T& data)
 			{
 				return typeid(T).hash_code();
-			}			
+			}
+			template<typename T>
+			void SetPacketType(T t)
+			{
+				*(uint16_t*)body.data() = (uint16_t)t;
+			}
 			
+			template <typename T>
+			T GetPacketType()
+			{
+				return (T) * (uint16_t*)&body[0];
+			}
 
 			Packet& operator=(const Packet& other);
 
@@ -83,28 +104,29 @@ namespace En3rN
 			Packet& operator<< (t& data)
 			{				
 				ItemHeader ih;
-				ih.type = SetType(data);
+				ih.type = SetItemType(data);
 				ih.size = sizeof(data);
 				
 				Append(&ih.type, sizeof(ih.type));
 				Append(&ih.size, sizeof(ih.size));
 				Append(&data, ih.size);
-				//update PacketHeader				
+				//update PacketHeader
+				Net::Header header = Header();
 				header.itemcount++;
-				WriteHeader();
+				header.packetSize = (uint16_t)body.size();
+				memcpy(&body[0], &header, HeaderSize);
 				return *this;
 			}
 			template <typename t, class = typename std::enable_if<std::is_standard_layout<t>::value>::type>
 			Packet& operator>> (t& data)
 			{
-				uint16_t offset = sizeof(header.type) + sizeof(header.packetSize) + sizeof(header.itemcount);
+				uint16_t offset = HeaderSize;
 				ItemHeader ih;
-				size_t dataType = SetType(data);
-
+				size_t dataType = SetItemType(data);
 
 				while (offset < body.size())
 				{
-					ih.type = GetType(offset);
+					ih.type = GetItemType(offset);
 					ih.size = GetItemSize(offset);
 
 					if (ih.type == dataType)

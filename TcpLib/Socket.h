@@ -1,7 +1,8 @@
 #pragma once
+#include "Network.h"
 #include "IPEndpoint.h"
 
-typedef SOCKET SocketHandle;
+using SocketHandle = SOCKET;
 namespace En3rN
 {
 	namespace Net

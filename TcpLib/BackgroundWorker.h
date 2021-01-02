@@ -1,20 +1,36 @@
 #pragma once
 #include <thread>
 #include <functional>
+#include "tsQue.h"
 
-class BackgroundWorker
+namespace En3rN
 {
-	std::thread worker;
-public:
-	BackgroundWorker() = default;
-	~BackgroundWorker()
+
+	/*class BackgroundWorker
 	{
-		if (!worker.joinable()) worker.detach(); else worker.join();
-	}
-	template <typename T>
-	int DoWork(std::function<T> task)
-	{
-		task();
-	}
-};
+	public:
+		BackgroundWorker() = default;
+		~BackgroundWorker() = default;
+		
+		int Stop()
+		{
+			worker.join();
+		}
+		void DoWork()
+		{
+			for (auto work : WorkQue.que)
+			{
+				work;
+				WorkQue.PopFront();
+			}
+			while (WorkQue.Empty())
+				std::this_thread::yield();
+		}
+	private:
+		std::thread worker{ (DoWork, this) };
+	public:
+		tsQue<std::function<void>> WorkQue;
+		
+	};*/
+}
 

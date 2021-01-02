@@ -167,6 +167,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Connecter.cpp" />
     <ClCompile Include="Connection.cpp" />
     <ClCompile Include="helpers.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
@@ -175,6 +176,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="IPEndpoint.cpp" />
+    <ClCompile Include="Listener.cpp" />
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="Packet.cpp" />
@@ -186,10 +188,13 @@
   <ItemGroup>
     <ClInclude Include="AppSettings.h" />
     <ClInclude Include="BackgroundWorker.h" />
+    <ClInclude Include="Connecter.h" />
     <ClInclude Include="Connection.h" />
     <ClInclude Include="consolecolor.h" />
-    <ClInclude Include="Header.h" />
-    <ClInclude Include="packettype.h" />
+    <ClInclude Include="Event.h" />
+    <ClInclude Include="Listener.h" />
+    <ClInclude Include="result.h" />
+    <ClInclude Include="serverpacket.h" />
     <ClInclude Include="helpers.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
@@ -201,6 +206,7 @@
     <ClInclude Include="Network.h" />
     <ClInclude Include="Packet.h" />
     <ClInclude Include="Socket.h" />
+    <ClInclude Include="TcpBase.h" />
     <ClInclude Include="TcpClient.h" />
     <ClInclude Include="tsQue.h" />
     <ClInclude Include="TcpServer.h" />

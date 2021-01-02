@@ -1,4 +1,5 @@
 #pragma once
+//ip, port, timeout, loop, netth, consoleth
 struct AppSettings
 {	
 	const char* ip;

@@ -1,8 +1,11 @@
 #pragma once
+#include "Network.h"
 #include "AppSettings.h"
 #include <iostream>
 #include <vector>
 #include "User.h"
+#include "Connection.h"
+#include "tsQue.h"
 #include "Packet.h"
 
 namespace En3rN
@@ -11,20 +14,18 @@ namespace En3rN
 	{
 		class TcpClient
 		{
-		protected:
-			AppSettings settings;
-			std::shared_ptr<Connection>					connection{};			
-			bool										m_running = false;
-
-
-			tsQue<Packet>	incManager;
-			tsQue<Packet>	outManager;			
+			int ProcessPackets();
+			
 		public:
 			TcpClient();			
 			virtual ~TcpClient();
-			virtual int OnClientConnect(const std::shared_ptr<Connection>& connection);
-			virtual int OnClientDisconnect(const std::shared_ptr<Connection>& connection);
-			virtual int ProcessPackets(tsQue<Packet>& incManager, tsQue<Packet>& outManager, const std::shared_ptr<Connection>& connection);
+			virtual int onClientConnect(const std::shared_ptr<Connection> & connection);
+			virtual int onClientDisconnect(const std::shared_ptr<Connection> & connection);
+			virtual int onUserPacket(Packet& Packet);
+			virtual int onUserUpdate();
+			
+			
+			
 			bool Update();
 			int SendData(Packet& packet);
 			int NetworkFrame();
@@ -32,6 +33,15 @@ namespace En3rN
 			int Init();
 			int Start();
 			int Stop();
+
+		protected:
+			AppSettings settings;
+			std::shared_ptr<Connection>							connection{};
+			bool										m_running = false;
+
+
+			tsQue<Packet>	incManager;
+			tsQue<Packet>	outManager;
 
 		};
 	}

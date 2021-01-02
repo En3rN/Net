@@ -1,17 +1,19 @@
+
 #include "Connection.h"
 #include <fstream>
 namespace En3rN
 {
     namespace Net
-    {
-
+    {        
         uint16_t En3rN::Net::Connection::idCounter = 1000;
+
 
         En3rN::Net::Connection::Connection(Type aType, Socket&& aSocket, IPEndpoint&& aEndpoint, tsQue<Packet>& aOutManager,tsQue<Packet>& aIncManager) :
             type(aType), socket(std::move(aSocket)), endpoint(std::move(aEndpoint)),outPacketQue(aOutManager), incPacketQue(aIncManager)
         {
             id = idCounter;
             idCounter++;
+            stage = ValidationStage::NotStarted;
             pFd = { socket.handle,POLLRDNORM,0 };
             if (type == Type::Listener) { Bind(); Listen(); }
             if (type == Type::Connecter) {Connect();}            
@@ -55,7 +57,7 @@ namespace En3rN
 
             while (bytesReceived < sizeof(uint16_t))
             {
-                bytes = recv(socket.handle, &packet.body[bytesReceived], sizeof(packet.header), 0);
+                bytes = recv(socket.handle, &packet.body[bytesReceived], Packet::HeaderSize, 0);
                 if (bytes == 0)
                 {
                     Disconnect(Helpers::Brackets(id) + " Recv 0");
@@ -85,7 +87,6 @@ namespace En3rN
                 remainingSize = packet.Size();
             }
 
-
             while (bytesReceived < packet.Size())
             {
                 remainingSize -= bytesReceived;
@@ -104,14 +105,8 @@ namespace En3rN
                 if (bytes == 0) break;
                 bytesReceived += bytes;
 
-            }
-            if (bytesReceived < 6) return 0; else packet.ReadHeader();
-
-            if (stage > ValidationStage::NotStarted && stage < ValidationStage::Validated)
-            {
-                stage = Validate(packet);
-                if (stage == ValidationStage::NotValidated) return -10; else return bytesReceived;
-            }
+            }           
+           
             if (bytesReceived != packet.Size())
             {
                 logger(LogLvl::Error) << Helpers::Brackets(id)<< " Packet header mismath. Received: [" << bytesReceived << "/" << packet.Size() << "]";
@@ -135,13 +130,18 @@ namespace En3rN
                 fs << "\r\n";
                 fs.close();
                 
-                return bytes;
+                return bytesReceived;
             }
             else
             {
                 logger(LogLvl::Debug) << "Packet Succsesfully Received! [" << bytesReceived << "/" << packet.Size() << "]";
+                if (stage > ValidationStage::NotStarted && stage < ValidationStage::Validated)
+                {
+                    stage = Validate(packet);
+                    if (stage == ValidationStage::NotValidated) return -10; else return bytesReceived;
+                }
                 incPacketQue << std::move(packet);
-                return bytes;
+                return bytesReceived;
             }
         }
 
@@ -227,7 +227,7 @@ namespace En3rN
             std::string encryptedKey=Encrypt(key);
             newClient->handshake = encryptedKey;
             newClient->stage = ValidationStage::Started;
-            Packet phandshake(newClient, PacketType::HandShake);
+            Packet phandshake(ServerPacket::HandShake, newClient);
             phandshake << key;
             outPacketQue << std::move(phandshake);            
             
@@ -347,7 +347,7 @@ namespace En3rN
                 return ValidationStage::Validated;
             }
                 
-            if (packet.GetPacketType() != PacketType::HandShake)
+            if (packet.GetPacketType<ServerPacket>() != ServerPacket::HandShake)
             {
                 connected = false;                
                 return ValidationStage::NotValidated;

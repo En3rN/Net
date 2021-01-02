@@ -4,7 +4,6 @@
 #include "User.h"
 #include "helpers.h"
 #include "Packet.h"
-#include "packettype.h"
 #include "helpers.h"
 
 
@@ -29,13 +28,13 @@ public:
 int main() 
 {
 	using namespace En3rN::Net;
-	MyClient client("localhost", 50000, true, true, true, 5);
+	MyClient client("gafi", 55000, true, true, false, 5);
 	if (client.Init() == 0) client.Start();
 	while (client.Update())
 	{
 
 		std::string s = "all " + Helpers::GenerateKey();
-		Packet p;
+		Packet p(ServerPacket::Message);
 		p << s;
 		std::this_thread::sleep_for(std::chrono::seconds(1));		
 		client.SendData(p);

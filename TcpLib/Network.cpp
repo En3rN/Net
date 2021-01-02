@@ -1,4 +1,3 @@
-
 #include "Network.h"
 #include "logger.h"
 namespace En3rN

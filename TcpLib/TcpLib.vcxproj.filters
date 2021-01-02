@@ -45,6 +45,12 @@
     <ClCompile Include="helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Listener.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Connecter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="consolecolor.h">
@@ -86,16 +92,28 @@
     <ClInclude Include="AppSettings.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="packettype.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="tsVec.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="tsQue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Header.h">
+    <ClInclude Include="TcpBase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="serverpacket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="result.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Event.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Listener.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Connecter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

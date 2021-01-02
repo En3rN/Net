@@ -5,8 +5,7 @@
 #include <mutex>
 
 namespace En3rN::Net
-{
-		class Packet;
+{		
 		template <typename T>
 		class tsQue 
 		{
