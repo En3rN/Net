@@ -29,8 +29,8 @@ namespace En3rN
             return 0;
         }
 
-        int TcpClient::onUserPacket(Packet& Packet)
-        {
+        int TcpClient::onUserPacket(Packet& packet)
+        {            
             return 0;
         }
 
@@ -109,7 +109,7 @@ namespace En3rN
                 std::string str;
                 int i;
                 //todo find out what server needs to do with msg
-                logger(LogLvl::Debug) << "Incomming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
+                logger(LogLvl::Debug) << "Incoming PacketQue items : [" << incManager.Size() << "] Outgoing PacketQue items: [" << outManager.Size() << ']';
                 switch (packet.GetPacketType<ServerPacket>())
                 {
                 case ServerPacket::Message:
@@ -158,10 +158,9 @@ namespace En3rN
            
             return m_running;
         }
-        int TcpClient::SendData(Packet& packet)
+        int TcpClient::SendPacket(Packet& packet)
         {            
             outManager << std::move(packet);
-
             return 0;
         }
         int TcpClient::NetworkFrame()

@@ -7,7 +7,7 @@ namespace En3rN
 	{
 		enum class ServerPacket :uint16_t
 		{			
-			ClientID = 65000, HandShake, Message 	// internal packet types
+			ClientID = 65000, HandShake, Message , Exit	// internal packet types
 		};
 	}
 }

@@ -1,7 +1,7 @@
 #pragma once
 #include "Network.h"
 
-namespace En3rM::Net
+namespace En3rN::Net
 {
 	template <typename t>
 	class TcpBase

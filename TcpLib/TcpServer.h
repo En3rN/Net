@@ -40,7 +40,7 @@ namespace En3rN
 			virtual int onUserPacket(Packet& Packet);
 			virtual int onUserUpdate();
 			bool		Update();
-			int			SendData(Packet& packet);
+			int			SendPacket(Packet& packet);
 			int			Init();
 			int			Start();
 			int			Stop();

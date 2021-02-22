@@ -14,6 +14,7 @@
 #include <mutex>
 #include "BackgroundWorker.h"
 
+
 namespace En3rN
 {
     namespace Net
@@ -135,6 +136,9 @@ namespace En3rN
                 case ServerPacket::HandShake:
                     //packet.address->Validate(packet);
                     break;
+                case ServerPacket::Exit:
+                    m_running = false;
+                    break;
                 default:
                     if(onUserPacket(packet)!=0) return 1;
                     break;
@@ -152,7 +156,7 @@ namespace En3rN
             return 0;
         }
 
-        int TcpServer::SendData(Packet& packet)
+        int TcpServer::SendPacket(Packet& packet)
         {
             incManager << packet;
             return 0;
@@ -273,6 +277,14 @@ namespace En3rN
             {
                 m_running = false;
                 return -1;
+            }
+            if (strBuf == "game")
+            {
+                Packet p;
+                p.address = connections.back();
+                p.SetPacketType(3);
+                outManager << std::move(p);
+                return 0;
             }
 
             std::vector<std::string> v = Helpers::Split(strBuf, ' ');

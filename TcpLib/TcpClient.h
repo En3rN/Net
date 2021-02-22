@@ -27,7 +27,7 @@ namespace En3rN
 			
 			
 			bool Update();
-			int SendData(Packet& packet);
+			int SendPacket(Packet& packet);
 			int NetworkFrame();
 			int Console();
 			int Init();
